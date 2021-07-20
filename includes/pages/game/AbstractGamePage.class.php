@@ -114,7 +114,7 @@ abstract class AbstractGamePage
 		$PlanetListing	= array();
 		$buildInfo	= array();
 		
-		if(isset($USER['PLANETS'])) {
+		if(!isset($USER['PLANETS'])) {
 			$USER['PLANETS']	= getPlanets($USER);
 		}
 		foreach($USER['PLANETS'] as $PlanetQuery)
