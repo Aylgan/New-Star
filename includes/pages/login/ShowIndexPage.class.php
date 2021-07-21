@@ -73,7 +73,7 @@ class ShowIndexPage extends AbstractLoginPage
 			'code'					=> $loginCode,
 			'descHeader'			=> sprintf($LNG['loginWelcome'], $config->game_name),
 			'descText'				=> sprintf($LNG['loginServerDesc'], $config->game_name),
-			'loginInfo'				=> sprintf($LNG['loginInfo'], '<a href="index.php?page=rules">'.$LNG['nav_rules'].'</a>')
+			'loginInfo'				=> sprintf($LNG['loginInfo'], "")
 		));
 		
 		$this->display('page.index.default.tpl');

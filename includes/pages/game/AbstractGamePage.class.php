@@ -30,6 +30,7 @@ abstract class AbstractGamePage
 	protected $ecoObj;
 	protected $window;
 	protected $disableEcoSystem = false;
+	public $jsonArr = [];
 
 	protected function __construct() {
 
@@ -354,8 +355,8 @@ abstract class AbstractGamePage
 			'resourceTable'		=> $resourceTable,
 			'shortlyNumber'		=> $themeSettings['TOPNAV_SHORTLY_NUMBER'],
 			'closed'			=> !$config->game_disable,
-			'hasBoard'			=> filter_var($config->forum_url, FILTER_VALIDATE_URL),
-			'hasAdminAccess'	=> !empty(Session::load()->adminAccess),
+			'hasBoard'			=> false,
+			'hasAdminAccess'	=> false,
 			'hasGate'			=> $PLANET[$resource[43]] > 0,
 		));
 	}
@@ -473,7 +474,7 @@ abstract class AbstractGamePage
 	}
 
 	protected function assign($array, $nocache = true) {
-		$this->tplObj->assign_vars($array, $nocache);
+		$this->jsonArr = array_merge($array, $this->jsonArr);
 	}
 
 	protected function display($file) {
@@ -502,7 +503,8 @@ abstract class AbstractGamePage
             'reslist'		=> $reslist,
 		), false);
 
-		$this->tplObj->display('extends:layout.'.$this->getWindow().'.tpl|'.$file);
+		echo json_encode($this->jsonArr, true);
+		//$this->tplObj->display('extends:layout.'.$this->getWindow().'.tpl|'.$file);
 		exit;
 	}
 

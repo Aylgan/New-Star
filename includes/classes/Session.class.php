@@ -20,6 +20,7 @@ class Session
 	static private $obj = NULL;
 	static private $iniSet	= false;
 	private $data = NULL;
+	private $error = NULL;
 
 	/**
 	 * Set PHP session settings
@@ -34,27 +35,6 @@ class Session
 			return false;
 		}
 		self::$iniSet = true;
-
-		ini_set('session.use_cookies', '1');
-		ini_set('session.use_only_cookies', '1');
-		ini_set('session.use_trans_sid', 0);
-		ini_set('session.auto_start', '0');
-		ini_set('session.serialize_handler', 'php');  
-		ini_set('session.gc_maxlifetime', SESSION_LIFETIME);
-		ini_set('session.gc_probability', '1');
-		ini_set('session.gc_divisor', '1000');
-		ini_set('session.bug_compat_warn', '0');
-		ini_set('session.bug_compat_42', '0');
-		ini_set('session.cookie_httponly', true);
-		ini_set('session.save_path', CACHE_PATH.'sessions');
-		ini_set('upload_tmp_dir', CACHE_PATH.'sessions');
-		
-		$HTTP_ROOT = MODE === 'INSTALL' ? dirname(HTTP_ROOT) : HTTP_ROOT;
-		
-		session_set_cookie_params(SESSION_LIFETIME, $HTTP_ROOT, NULL, HTTPS, true);
-		session_cache_limiter('nocache');
-		session_name('2Moons');
-
 		return true;
 	}
 
@@ -107,20 +87,28 @@ class Session
 	/**
 	 * Create an empty session
 	 *
-	 * @return Session
+	 * @return Session data
 	 */
 
-	static public function create()
+	public function create()
 	{
-		if(!self::existsActiveSession())
-		{
-			self::$obj	= new self;
-			register_shutdown_function(array(self::$obj, 'save'));
+		$activeSession = $this->existsActiveSession();
 
-			@session_start();
+		$data = array(
+			'authKey' => md5($this->userID .uniqid()),
+			'expire' => TIMESTAMP + 60*60*24,
+			'lastonline' => TIMESTAMP
+		);
+
+		$this->data = array_merge($data, $this->data);
+
+		if($activeSession){
+			$this->data['authKey'] = $activeSession['authKey'];
 		}
 
-		return self::$obj;
+		register_shutdown_function(array($this, 'save'));
+
+		return $this->data;
 	}
 
 	/**
@@ -129,35 +117,64 @@ class Session
 	 * @return Session
 	 */
 
-	static public function load()
+	public function load($authKey)
 	{
-		if(!self::existsActiveSession())
-		{
-			self::init();
-			session_start();
-			if(isset($_SESSION['obj']))
-			{
-				self::$obj	= unserialize($_SESSION['obj']);
-				register_shutdown_function(array(self::$obj, 'save'));
+		$sql	= "SELECT * FROM %%AUTH%% WHERE authKey = :authKey;";
+		$auth	= Database::get()->selectSingle($sql, array(
+			':authKey'	=> $authKey,
+		));
+
+		if (!isset($auth)){
+			$this->error = array(
+				'error' => true,
+				'errorType' => 'authError',
+				'message' => 'authKey not found!'
+			);
+			return false;
+		}else{
+			if( $auth['expire'] < TIMESTAMP ){
+				$this->error = array(
+					'error' => true,
+					'errorType' => 'authError',
+					'message' => 'authKey expired!'
+				);
+				return false;
 			}
-			else
-			{
-				self::create();
-			}
+
 		}
 
-		return self::$obj;
+		$this->data = $auth;
+
+		register_shutdown_function(array($this, 'save'));
+
+		return $this->data;
+	}
+	
+	/**
+	 * Return error
+	 *
+	 * @return array
+	 */
+	
+	public function getError()
+	{
+		return $this->error;
 	}
 
 	/**
 	 * Check if an active session exists
 	 *
-	 * @return bool
+	 * @return array
 	 */
 
-	static public function existsActiveSession()
+	public function existsActiveSession()
 	{
-		return isset(self::$obj);
+		$sql	= "SELECT * FROM %%AUTH%% WHERE userID = :userID;";
+		$auth	= Database::get()->selectSingle($sql, array(
+			':userID'	=> $this->userID,
+		));
+
+		return $auth;
 	}
 
 	public function __construct()
@@ -199,97 +216,67 @@ class Session
 
 	public function save()
 	{
-	    // do not save an empty session
-	    $sessionId = session_id();
-	    if(empty($sessionId)) {
-	        return;
-	    }
-
 	    // sessions require an valid user.
-	    if(empty($this->data['userId'])) {
+	    if(empty($this->data['userID']) || $this->data['expire'] < TIMESTAMP) {
 	        $this->delete();
 	    }
 
         $userIpAddress = self::getClientIp();
-        if(!(isset($_GET['page']) && $_GET['page']=="raport" && isset($_GET['raport']) && count($_GET)==2 && MODE === 'INGAME')) {
-            $sql	= 'REPLACE INTO %%SESSION%% SET
-            sessionID	= :sessionId,
-            userID		= :userId,
-            lastonline	= :lastActivity,
-            userIP		= :userAddress;';
+		
+		$sql	= 'REPLACE INTO %%AUTH%% SET
+		authKey	= :authKey,
+		userID		= :userId,
+		lastonline	= :lastActivity,
+		userIP		= :userAddress,
+		expire		= :expire;';
 
-            $db		= Database::get();
+		$db		= Database::get();
 
-            $db->replace($sql, array(
-                ':sessionId'	=> session_id(),
-                ':userId'		=> $this->data['userId'],
-                ':lastActivity'	=> TIMESTAMP,
-                ':userAddress'	=> $userIpAddress,
-            ));
+		$db->replace($sql, array(
+			':authKey'		=> $this->data['authKey'],
+			':userId'		=> $this->data['userID'],
+			':lastActivity'	=> TIMESTAMP,
+			':userAddress'	=> $userIpAddress,
+			':expire'		=> TIMESTAMP + 60*60*24
+		));
 
-            $sql = 'UPDATE %%USERS%% SET
-            onlinetime	= :lastActivity,
-            user_lastip = :userAddress
-            WHERE
-            id = :userId;';
+		$sql = 'UPDATE %%USERS%% SET
+		onlinetime	= :lastActivity,
+		user_lastip = :userAddress
+		WHERE
+		id = :userId;';
 
-            $db->update($sql, array(
-               ':userAddress'	=> $userIpAddress,
-               ':lastActivity'	=> TIMESTAMP,
-               ':userId'		=> $this->data['userId'],
-            ));
+		$db->update($sql, array(
+		   ':userAddress'	=> $userIpAddress,
+		   ':lastActivity'	=> TIMESTAMP,
+		   ':userId'		=> $this->data['userID'],
+		));
 
-            $this->data['lastActivity']  = TIMESTAMP;
-            $this->data['sessionId']	 = session_id();
-            $this->data['userIpAddress'] = $userIpAddress;
-            $this->data['requestPath']	 = $this->getRequestPath();
+		$this->data['lastActivity']  	= TIMESTAMP;
+		$this->data['authKey'] 			= $this->data['authKey'];
+		$this->data['sessionId']	 	= session_id();
+		$this->data['userIpAddress'] 	= $userIpAddress;
+		$this->data['requestPath']	 	= $this->getRequestPath();
 
-            $_SESSION['obj']	= serialize($this);
+		$_SESSION['obj']	= serialize($this);
 
-            @session_write_close();
-        }
+		@session_write_close();
+        
 	}
 
 	public function delete()
 	{
-		$sql	= 'DELETE FROM %%SESSION%% WHERE sessionID = :sessionId;';
+		$sql	= 'DELETE FROM %%AUTH%% WHERE authKey = :authKey;';
 		$db		= Database::get();
 
 		$db->delete($sql, array(
-			':sessionId'	=> session_id(),
+			':authKey'	=> $this->data['authKey'],
 		));
-
-		@session_destroy();
 	}
 
 	public function isValidSession()
 	{
-		//if($this->compareIpAddress($this->data['userIpAddress'], self::getClientIp(), COMPARE_IP_BLOCKS) === false)
-		//{
-		//	return false;
-		//}
-
-        if(isset($_GET['page']) && $_GET['page']=="raport" && isset($_GET['raport']) && count($_GET)==2 && MODE === 'INGAME') {
-		$this->data['lastActivity']=time(); } else { if(!isset($_SESSION["obj"])) { return false; } }
-        
-		if($this->data['lastActivity'] < TIMESTAMP - SESSION_LIFETIME)
-		{
-			return false;
-		}
-
-		$sql = 'SELECT COUNT(*) as record FROM %%SESSION%% WHERE sessionID = :sessionId;';
-		$db		= Database::get();
-
-		$sessionCount = $db->selectSingle($sql, array(
-			':sessionId'	=> session_id(),
-		), 'record');
-
-		if($sessionCount == 0)
-		{
-			return false;
-		}
-
-		return true;
+		return false;
 	}
 
 	public function selectActivePlanet()
@@ -302,7 +289,7 @@ class Session
 
 			$db	= Database::get();
 			$planetId	= $db->selectSingle($sql, array(
-				':userId'	=> $this->data['userId'],
+				':userId'	=> $this->data['userID'],
 				':planetId'	=> $httpData,
 			), 'id');
 

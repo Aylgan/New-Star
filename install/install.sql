@@ -781,6 +781,16 @@ CREATE TABLE `%PREFIX%session` (
   KEY `sessionID` (`sessionID`)
 ) ENGINE=MEMORY DEFAULT CHARSET=utf8;
 
+CREATE TABLE `%PREFIX%apisession` (
+  `authKey` varchar(32) NOT NULL,
+  `userID` int(10) unsigned NOT NULL,
+  `userIP` varchar(40) NOT NULL,
+  `lastonline` int(11) NOT NULL,
+  `expire` int(11) NOT NULL,
+  PRIMARY KEY (`userID`),
+  KEY `authKey` (`authKey`)
+) ENGINE=MEMORY DEFAULT CHARSET=utf8;
+
 CREATE TABLE `%PREFIX%shortcuts` (
   `shortcutID` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `ownerID` int(10) unsigned NOT NULL,

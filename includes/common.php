@@ -36,7 +36,10 @@ error_reporting(E_ALL & ~E_STRICT);
 date_default_timezone_set(@date_default_timezone_get());
 
 ini_set('display_errors', 1);
-header('Content-Type: text/html; charset=UTF-8');
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: POST, PUT, DELETE, GET, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Content-Length, Accept-Encoding, Authorization, X-Requested-With");
+header('Content-Type: application/json; charset=UTF-8');
 define('TIMESTAMP',	time());
 	
 require 'includes/constants.php';
@@ -111,12 +114,16 @@ date_default_timezone_set($config->timezone);
 
 if (MODE === 'INGAME' || MODE === 'ADMIN' || MODE === 'CRON' || MODE === 'JSON')
 {
-	$session	= Session::load();
+	$authKey 	= HTTP::_GP('authKey', '');
+	$session	= new Session;
+	$auth = $session->load($authKey);
 
-	if(!$session->isValidSession())
+	if(!$auth)
 	{
-	    $session->delete();
-		HTTP::redirectTo('index.php?code=3');
+	    echo json_encode(
+			$session->getError()
+		);
+		exit;
 	}
 
     require 'includes/vars/General.php';
@@ -139,12 +146,16 @@ if (MODE === 'INGAME' || MODE === 'ADMIN' || MODE === 'CRON' || MODE === 'JSON')
 	
 	$USER	= $db->selectSingle($sql, array(
 		':unread'	=> 1,
-		':userId'	=> $session->userId
+		':userId'	=> $session->userID
 	));
 	
 	if(empty($USER))
 	{
-		HTTP::redirectTo('index.php?code=3');
+		echo json_encode(array(
+			'error'		=> true,
+			'message'		=> 'User not found!'
+		));
+		exit;
 	}
 	
 	$LNG	= new Language($USER['lang']);

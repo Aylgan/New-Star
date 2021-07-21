@@ -25,6 +25,7 @@ abstract class AbstractLoginPage
 	protected $tplObj = null;
 	protected $window;
 	public $defaultWindow = 'normal';
+	public $jsonArr = [];
 	
 	protected function __construct() {
 		
@@ -129,12 +130,17 @@ abstract class AbstractLoginPage
 	protected function save() {
 		
 	}
+	
+	protected function returnJson($array) {
+		echo json_encode($array, true);
+		exit;
+	}
 
 	protected function assign($array, $nocache = true) {
-		$this->tplObj->assign_vars($array, $nocache);
+		$this->jsonArr = array_merge($array, $this->jsonArr);
 	}
 	
-	protected function display($file) {
+	protected function display($file = '') {
 		global $LNG;
 		
 		$this->save();
@@ -166,7 +172,8 @@ abstract class AbstractLoginPage
 			'LNG'			=> $LNG,
 		), false);
 		
-		$this->tplObj->display('extends:layout.'.$this->getWindow().'.tpl|'.$file);
+		echo json_encode($this->jsonArr, true);
+		//$this->tplObj->display('extends:layout.'.$this->getWindow().'.tpl|'.$file);
 		exit;
 	}
 	

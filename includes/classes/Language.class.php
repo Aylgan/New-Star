@@ -16,8 +16,8 @@
  */
 
 class Language implements ArrayAccess {
-    private $container = array();
-    private $language = array();
+    public $container = array();
+    public $language = array();
     static private $allLanguages = array();
 	
 	static function getAllowedLangs($OnlyKey = true)

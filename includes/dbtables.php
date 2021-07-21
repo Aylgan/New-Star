@@ -68,6 +68,7 @@ $dbTableNames	= array(
     'VARS_BONUS'	 	=> DB_PREFIX.'vars_bonus',
     'MARKET'		    => DB_PREFIX.'market',
     'CONT'				=> DB_PREFIX.'conteiners', 
+	'AUTH' 				=> DB_PREFIX.'apisession',
     //$new_code
 );
 // MOD-TABLES

@@ -74,6 +74,44 @@ class HTTP {
 		
 		return $default;
 	}
+	
+	static public function _JSON($name = '', $default = '', $multibyte = false, $highnum = false)
+	{
+		$request_body = file_get_contents('php://input');
+
+		$data = json_decode($request_body, true);
+
+		if(!$name){
+			return $data;
+		}
+
+		if(!isset($data[$name]))
+		{
+			return $default;
+		}
+
+		if(is_float($default) || $highnum)
+		{
+			return (float) $data[$name];
+		}
+
+		if(is_int($default))
+		{
+			return (int) $data[$name];			
+		}
+
+		if(is_string($default))
+		{
+			return self::_quote($data[$name], $multibyte);
+		}
+
+		if(is_array($default) && is_array($data[$name]))
+		{
+			return self::_quoteArray($data[$name], $multibyte, !empty($default) && $default[0] === 0);
+		}
+
+		return $default;
+	}
 
 	private static function _quoteArray($var, $multibyte, $onlyNumbers = false)
 	{
