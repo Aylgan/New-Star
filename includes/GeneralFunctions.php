@@ -226,6 +226,57 @@ function getPlanets($USER)
 	return $planetsList;
 }
 
+function getPlanetTiles($PLANET)
+{
+    global $LNG;
+
+    if(isset($PLANET['tiles']))
+        return $PLANET['tiles'];
+
+    $sql = "SELECT *
+			FROM %%BUILDS%% WHERE planet = :planetId";
+
+    $tilesResult = Database::get()->select($sql, array(
+        ':planetId'		=> $PLANET['id']
+    ));
+
+    $tilesList = array();
+    $planetTileList = array();
+
+    foreach($tilesResult as $tileRow) {
+        $planetTileList[$tileRow['tile']]	= $tileRow;
+    }
+
+    for($i=1;$i<=$PLANET['tiles_count'];$i++){
+        if(isset($planetTileList[$i])){
+            $tileContent = $planetTileList[$i];
+        }
+        else{
+            $tileContent = array(
+                'id'		=> 0,
+                'planet'	=> $PLANET['id'],
+                'build_id' 	=> 0,
+                'build_lvl'	=> 0,
+                'tile'		=> $i,
+                'lastupdate' => 0,
+                ''
+            );
+        }
+
+        $tileContent['showR'] = false;
+        $tileContent['rNUm'] = 0;
+        $tileContent['rRes'] = '';
+
+        $tileContent['name'] = ($tileContent['build_id'] !== 0) ? $LNG['tech'][$tileContent['build_id']] : $LNG['tile_empty'];
+
+        $tilesList[$i] = $tileContent;
+    }
+
+
+
+    return $tilesList;
+}
+
 function get_timezone_selector() {
 	// New Timezone Selector, better support for changes in tzdata (new russian timezones, e.g.)
 	// http://www.php.net/manual/en/datetimezone.listidentifiers.php

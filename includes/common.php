@@ -201,8 +201,9 @@ if (MODE === 'INGAME' || MODE === 'ADMIN' || MODE === 'CRON' || MODE === 'JSON')
 				$session->planetId = $USER['id_planet'];
 			}
 		}
-		
-		$USER['factor']		= getFactors($USER);
+        $PLANET['tiles']	= getPlanetTiles($PLANET);
+
+        $USER['factor']		= getFactors($USER);
 		$USER['PLANETS']	= getPlanets($USER);
         $reslist		    = getReslist($USER);
 	}

@@ -477,6 +477,12 @@ abstract class AbstractGamePage
 		$this->jsonArr = array_merge($array, $this->jsonArr);
 	}
 
+    protected function data($data) {
+
+        echo json_encode($data, true);
+        exit;
+    }
+
 	protected function display($file) {
 		global $THEME, $LNG, $reslist, $USER;
 

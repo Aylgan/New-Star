@@ -167,7 +167,170 @@ class ShowReduceResourcesPage extends AbstractGamePage
 		}
 		$this->printMessage(''.$LNG['rd_fleet_go'].'',true,  array("game.php?page=reduceresources", 2));
 	}
-	
+
+    function getRes()
+    {
+        global $resource, $USER, $PLANET, $ProdGrid, $reslist;
+
+        $this->setWindow('ajax');
+
+        $tile 		= HTTP::_GP('tile', 0);
+        $build 		= HTTP::_GP('build', 0);
+
+        $config	= Config::get();
+
+        $time = TIMESTAMP;
+
+        if ($USER['urlaubs_modus'] == 0)
+        {
+            if(!in_array($build, $reslist['prod']))
+                exit;
+
+            $ressIDs	= array_merge(array(), $reslist['resstype'][1], $reslist['resstype'][2]);
+
+            $temp	= array(
+                901	=> array(
+                    'plus'	=> 0,
+                    'minus'	=> 0,
+                ),
+                902	=> array(
+                    'plus'	=> 0,
+                    'minus'	=> 0,
+                ),
+                903	=> array(
+                    'plus'	=> 0,
+                    'minus'	=> 0,
+                ),
+            );
+
+            $BuildLevelFactor	= 10;
+            $BuildLevel 		= $PLANET['tiles'][$tile]['build_lvl'];
+            $BuildTemp		= $PLANET['temp_max'];
+
+            foreach($ressIDs as $ID)
+            {
+                if(!isset($ProdGrid[$build]['production'][$ID]))
+                    continue;
+
+                $Production	= eval("return ".$ProdGrid[$build]['production'][$ID].";");
+
+                if($Production > 0) {
+                    $temp[$ID]['plus']	+= $Production;
+                } else {
+                    if(in_array($ID, $reslist['resstype'][1]) && $PLANET[$resource[$ID]] == 0) {
+                        continue;
+                    }
+
+                    $temp[$ID]['minus']	+= $Production;
+                }
+            }
+
+            $metal_perhour		= ($temp[901]['plus'] * (1 + $USER['factor']['Resource'] + 0.02 * $USER[$resource[131]]) + $temp[901]['minus']) * $config->resource_multiplier;
+            $crystal_perhour	= ($temp[902]['plus'] * (1 + $USER['factor']['Resource'] + 0.02 * $USER[$resource[131]]) + $temp[902]['minus']) * $config->resource_multiplier;
+            $deuterium_perhour 	= ($temp[903]['plus'] * (1 + $USER['factor']['Resource'] + 0.02 * $USER[$resource[131]]) + $temp[903]['minus']) * $config->resource_multiplier;
+
+            $prodTime = min(($time - (int)$PLANET['tiles'][$tile]['lastupdate']),3600*$PLANET['tiles'][$tile]['upgrade_1']);
+
+            if($prodTime < 30)
+                exit;
+
+            $MetalTheoretical		= floor($prodTime * $metal_perhour / 3600);
+            $CristalTheoretical		= floor($prodTime * $crystal_perhour / 3600);
+            $DeuteriumTheoretical	= floor($prodTime * $deuterium_perhour / 3600);
+
+            $oldMetal = $PLANET['metal'];
+            $oldCrystal = $PLANET['crystal'];
+            $oldDeuterium = $PLANET['deuterium'];
+
+            if($MetalTheoretical != 0)
+            {
+                $PLANET['metal']      = max($PLANET['metal'] + $MetalTheoretical, 0);
+                $restype = 901;
+                $rescount = $PLANET['metal']-$oldMetal;
+            }
+            if($CristalTheoretical != 0)
+            {
+                $PLANET['crystal']      = max($PLANET['crystal'] + $CristalTheoretical, 0);
+                $restype = 902;
+                $rescount = $PLANET['crystal']-$oldCrystal;
+            }
+            if($DeuteriumTheoretical != 0)
+            {
+                $PLANET['deuterium']      = max($PLANET['deuterium'] + $DeuteriumTheoretical, 0);
+                $restype = 903;
+                $rescount = $PLANET['deuterium']-$oldDeuterium;
+            }
+
+            $tparams	= array(
+                ':lastupdate' => $time,
+                ':planetId' => $PLANET['id'],
+                ':tile' => $tile
+            );
+
+            $tSql	= "UPDATE %%BUILDS%% SET `lastupdate` = :lastupdate WHERE planet = :planetId AND tile = :tile;";
+
+            Database::get()->update($tSql, $tparams);
+
+            $PlanetRess	= new ResourceUpdate();
+
+            list($USER, $PLANET)	= $PlanetRess->CalcResource($USER, $PLANET, true);
+
+            $arr = array(
+                "e" => $tile,
+                "r" => $build,
+                "metal"	=> floor($PLANET['metal']),
+                "crystal"	=> floor($PLANET['crystal']),
+                "deuterium"	=> floor($PLANET['deuterium']),
+                "time"		=> $time,
+                "oldMetal"	=> 	$oldMetal,
+                "oldCrystal"	=> 	$oldCrystal,
+                "oldDeuterium"	=> 	$oldDeuterium,
+                "restype"		=> $restype,
+                "rescount"		=> floor($rescount),
+            );
+
+            $this->sendJSON($arr);
+        }
+    }
+
+    function getCurrentResources(){
+        global $USER, $PLANET, $reslist, $resource;
+
+        $config			= Config::get();
+
+        $resourceTable	= array();
+        $resourceSpeed	= $config->resource_multiplier;
+        foreach($reslist['resstype'][1] as $resourceID)
+        {
+            $resourceTable[$resourceID]['name']			= $resource[$resourceID];
+            $resourceTable[$resourceID]['current']		= (int)$PLANET[$resource[$resourceID]];
+            $resourceTable[$resourceID]['max']			= (int)$PLANET[$resource[$resourceID].'_max'];
+            if($USER['urlaubs_modus'] == 1 || $PLANET['planet_type'] != 1)
+            {
+                $resourceTable[$resourceID]['production']	= (int)$PLANET[$resource[$resourceID].'_perhour'];
+            }
+            else
+            {
+                $resourceTable[$resourceID]['production']	= (int)$PLANET[$resource[$resourceID].'_perhour'] + $config->{$resource[$resourceID].'_basic_income'} * $resourceSpeed;
+            }
+        }
+
+        foreach($reslist['resstype'][2] as $resourceID)
+        {
+            $resourceTable[$resourceID]['name']			= $resource[$resourceID];
+            $resourceTable[$resourceID]['used']			= $PLANET[$resource[$resourceID].'_used'];
+            $resourceTable[$resourceID]['max']			= (int)$PLANET[$resource[$resourceID]];
+        }
+
+        foreach($reslist['resstype'][3] as $resourceID)
+        {
+            $resourceTable[$resourceID]['name']			= $resource[$resourceID];
+            $resourceTable[$resourceID]['current']		= (int)$USER[$resource[$resourceID]];
+        }
+
+        $this->data($resourceTable);
+    }
+
 	public function show()
 	{
 		global $USER, $PLANET, $resource, $pricelist, $reslist, $LNG;

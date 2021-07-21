@@ -180,27 +180,96 @@ class ShowBuildingsPage extends AbstractGamePage
 		return true;
 	}
 
-	private function AddBuildingToQueue($Element, $lvlup, $lvlup1, $levelToBuildInFo, $AddMode = true)
+	private function AddBuildingToQueue($Element, $AddMode = true, $tile = 0, $type = 'normal')
 	{
-		if($this->bOnInsert==FALSE){
-			$this->build_anz=(int)$lvlup - $levelToBuildInFo;
-			if($this->build_anz>=1){
-				$this->bOnInsert=TRUE;
-				while($this->build_anz>0){
-					$this->DoAddBuildingToQueue($Element, $AddMode);
-					$this->build_anz=$this->build_anz-1;
-				}
-				$this->bOnInsert=FALSE;
-			}
-		}
+        global $PLANET, $USER, $resource, $reslist, $pricelist;
+
+        if(!in_array($Element, $reslist['allow'][$PLANET['planet_type']])
+            || !BuildFunctions::isTechnologieAccessible($USER, $PLANET, $Element)
+            || ($Element == 31 && $USER["b_tech_planet"] != 0)
+            || (($Element == 15 || $Element == 21) && !empty($PLANET['b_hangar_id']))
+            || (!$AddMode && $PLANET[$resource[$Element]] == 0)
+        )
+            return;
+
+        $CurrentQueue  		= unserialize($PLANET['b_building_id']);
+
+
+        if (!empty($CurrentQueue)) {
+            $ActualCount	= count($CurrentQueue);
+        } else {
+            $CurrentQueue	= array();
+            $ActualCount	= 0;
+        }
+
+        $CurrentMaxFields  	= CalculateMaxPlanetFields($PLANET);
+
+        $config	= Config::get();
+
+        if (($type == 'normal' && $AddMode && $PLANET["field_current"] >= ($CurrentMaxFields - $ActualCount)))
+        {
+            return;
+        }
+
+        foreach($CurrentQueue as $QueueSubArray)
+        {
+            if($QueueSubArray[5] == $tile && ($QueueSubArray[3] > TIMESTAMP))
+                return;
+        }
+
+        $BuildMode 			= $AddMode ? 'build' : 'destroy';
+
+        if($type == 'normal')
+            $BuildLevel			= $PLANET[$resource[$Element]] + (int) $AddMode;
+        else{
+            $BuildLevel			= $PLANET['tiles'][$tile]['build_lvl'] + (int) $AddMode;
+
+            if($PLANET['tiles'][$tile]['build_id'] != 0 && $PLANET['tiles'][$tile]['build_id'] != $Element)
+                return;
+        }
+
+        if($pricelist[$Element]['max'] < $BuildLevel)
+            return;
+
+        $costResources		= BuildFunctions::getElementPrice($USER, $PLANET, $Element, !$AddMode, $BuildLevel);
+
+        if(!BuildFunctions::isElementBuyable($USER, $PLANET, $Element, $costResources))
+            return;
+
+        if(isset($costResources[901])) { $PLANET[$resource[901]]	-= $costResources[901]; }
+        if(isset($costResources[902])) { $PLANET[$resource[902]]	-= $costResources[902]; }
+        if(isset($costResources[903])) { $PLANET[$resource[903]]	-= $costResources[903]; }
+        if(isset($costResources[921])) { $USER[$resource[921]]		-= $costResources[921]; }
+
+        $elementTime    			= BuildFunctions::getBuildingTime($USER, $PLANET, $Element, $costResources);
+        $BuildEndTime				= TIMESTAMP + $elementTime;
+        $CurrentQueue[]				= array($Element, $BuildLevel, $elementTime, $BuildEndTime, $BuildMode, $tile);
+        $PLANET['b_building_id']	= serialize($CurrentQueue);
+
+        $b_building = 0;
+        foreach($CurrentQueue as $key => $builElem)
+        {
+            $Element      	= $builElem[0];
+            $BuildEndTime 	= $builElem[3];
+            $BuildMode    	= $builElem[4];
+
+            if ($BuildEndTime > TIMESTAMP){
+                if($b_building == 0)
+                    $b_building = $BuildEndTime;
+                elseif($b_building > $BuildEndTime)
+                    $b_building = $BuildEndTime;
+            }
+        }
+
+        $PLANET['b_building']		= $BuildEndTime;
 	}
 	 
-	private function DoAddBuildingToQueue($Element, $AddMode = true)	
+	private function DoAddBuildingToQueue($Element, $AddMode = true)
     {
 		global $PLANET, $USER, $resource, $reslist, $pricelist;
-		
+
 		if(!in_array($Element, $reslist['allow'][$PLANET['planet_type']])
-			|| !BuildFunctions::isTechnologieAccessible($USER, $PLANET, $Element) 
+			|| !BuildFunctions::isTechnologieAccessible($USER, $PLANET, $Element)
 			|| (!$AddMode && $PLANET[$resource[$Element]] == 0)
 		)
 			return;
@@ -209,42 +278,42 @@ class ShowBuildingsPage extends AbstractGamePage
             if($Element == $lab && $USER["b_tech_planet"] != 0)
                 return;
         }
-        
+
         foreach($reslist['shipyard'] as $shipyard) {
             if($Element == $shipyard && !empty($PLANET['b_hangar_id']))
                 return;
         }
 
 		$CurrentQueue  		= unserialize($PLANET['b_building_id']);
-	
+
 		if (!empty($CurrentQueue)) {
 			$ActualCount	= count($CurrentQueue);
 		} else {
 			$CurrentQueue	= array();
 			$ActualCount	= 0;
 		}
-		
+
 		$CurrentMaxFields  	= CalculateMaxPlanetFields($PLANET);
- 
+
         $config	= Config::get();
 
 		if (($AddMode && $PLANET["field_current"] >= ($CurrentMaxFields - $ActualCount)))
 		{
 			return;
 		}
-		
+
 		foreach($CurrentQueue as $QueueSubArray)
 		{
 			if($QueueSubArray[0] == $Element)
 				return;
 		}
-	
+
 		$BuildMode 			= $AddMode ? 'build' : 'destroy';
 		$BuildLevel			= $PLANET[$resource[$Element]] + (int) $AddMode;
-		
+
 		if($pricelist[$Element]['max'] < $BuildLevel)
 			return;
-		
+
 		$costResources		= BuildFunctions::getElementPrice($USER, $PLANET, $Element, !$AddMode, $BuildLevel);
 
 		if(!BuildFunctions::isElementBuyable($USER, $PLANET, $Element, $costResources))
@@ -258,7 +327,7 @@ class ShowBuildingsPage extends AbstractGamePage
 		$elementTime    			= BuildFunctions::getBuildingTime($USER, $PLANET, $Element, $costResources);
 		$BuildEndTime				= TIMESTAMP + $elementTime;
 		$CurrentQueue[]				= array($Element, $BuildLevel, $elementTime, $BuildEndTime, $BuildMode);
-		$PLANET['b_building_id']	= serialize($CurrentQueue);	
+		$PLANET['b_building_id']	= serialize($CurrentQueue);
 
 		$b_building = 0;
 		foreach($CurrentQueue as $key => $builElem)
@@ -277,7 +346,7 @@ class ShowBuildingsPage extends AbstractGamePage
 
 		$PLANET['b_building']		= $BuildEndTime;
     }
-    
+
 	private function getQueueData()
 	{
 		global $LNG, $PLANET, $USER;
@@ -328,40 +397,52 @@ class ShowBuildingsPage extends AbstractGamePage
 		return $level;
 	}
 
+    public function tile()
+    {
+        global $PLANET;
+
+        $data = $PLANET['tiles'];
+
+        $this->data($data);
+    }
+
 	public function show()
 	{
-		global $ProdGrid, $LNG, $resource, $reslist, $PLANET, $USER, $pricelist, $requeriments;
+		global $ProdGrid, $LNG, $resource, $reslist, $PLANET, $USER, $pricelist, $requeriments, $THEME;
 		
 		$TheCommand		= HTTP::_GP('cmd', '');
+
+        $type			= HTTP::_JSON('type', 'normal');
+        $tile			= HTTP::_JSON('tile', 1);
 
 		// wellformed buildURLs
 		if(!empty($TheCommand) && $_SERVER['REQUEST_METHOD'] === 'POST' && $USER['urlaubs_modus'] == 0)
 		{
 			$Element     	= HTTP::_GP('building', 0);
 			$ListID      	= HTTP::_GP('listid', 0);
+			/*
 			$lvlup      			= HTTP::_GP('lvlup', 0);
 			$lvlup1      			= HTTP::_GP('lvlup1', 0);
 			$levelToBuildInFo      	= HTTP::_GP('levelToBuildInFo', 0);
+			*/
+
 			switch($TheCommand)
 			{
 				case 'cancel':
 					$this->CancelBuildingFromQueue();
 				break;
-				case 'remove':
-					$this->RemoveBuildingFromQueue($ListID);
-				break;
 				case 'insert':
-					$this->AddBuildingToQueue($Element, $lvlup, $lvlup1, $levelToBuildInFo, true);
+					$this->AddBuildingToQueue($Element, true, $tile, $type);
 				break;
 				case 'destroy':
-					$this->DoAddBuildingToQueue($Element, false);
+					$this->AddBuildingToQueue($Element, false, $tile, $type);
 				break;
 				case 'fast':
 				    $this->FastBuildingFromQueue($Element);
 				break;
 			}
 			
-			$this->redirectTo('game.php?page=buildings');
+			$this->redirectTo('game.php?page=overview');
 		}
         $config				= Config::get();
 
@@ -369,128 +450,176 @@ class ShowBuildingsPage extends AbstractGamePage
 		$Queue	 			= $queueData['queue'];
 		$QueueCount			= count($Queue);
 		$CanBuildElement 	= !isVacationMode($USER);
-		$CurrentMaxFields   = CalculateMaxPlanetFields($PLANET);
-		
-		$RoomIsOk 			= $PLANET['field_current'] < ($CurrentMaxFields - $QueueCount);	
-		$BuildLevelFactor   = 10;
-		$BuildTemp          = $PLANET['temp_max'];
 
-        $BuildInfoList      = array();
+        if($type == 'normal'){
 
-		$Elements			= $reslist['allow'][$PLANET['planet_type']];
-		
-		foreach($Elements as $ID => $Element)
-		{
-			if(isset($queueData['quickinfo'][$Element]))
-			{
-				$levelToBuild	= $queueData['quickinfo'][$Element];
-			}
-			else
-			{
-				$levelToBuild	= $PLANET[$resource[$Element]];
-			}
+            $CurrentMaxFields   = CalculateMaxPlanetFields($PLANET);
 
-            foreach(array_merge($reslist['resstype'][1], $reslist['resstype'][2]) as $res)
-            { 
-                $info_production[''.$res.'']	= "";
-                
+            $RoomIsOk 			= $PLANET['field_current'] < ($CurrentMaxFields - $QueueCount);
+
+            $BuildEnergy		= $USER[$resource[113]];
+            $BuildLevelFactor   = 10;
+            $BuildTemp          = $PLANET['temp_max'];
+
+            $BuildInfoList      = array();
+
+            $Elements			= $reslist['allow'][$PLANET['planet_type']];
+
+            foreach($Elements as $Element)
+            {
+                if (!BuildFunctions::isTechnologieAccessible($USER, $PLANET, $Element))
+                    continue;
+
+                $infoEnergy	= "";
+
+                if(isset($queueData['quickinfo'][$Element]))
+                {
+                    $levelToBuild	= $queueData['quickinfo'][$Element];
+                }
+                else
+                {
+                    $levelToBuild	= $PLANET[$resource[$Element]];
+                }
+
                 if(in_array($Element, $reslist['prod']))
                 {
                     $BuildLevel	= $PLANET[$resource[$Element]];
-                    $Need		= eval(ResourceUpdate::getProd($ProdGrid[$Element]['production'][''.$res.'']));
-                                        
-                    $BuildLevel	= $levelToBuild + 1;
-                    $Prod		= eval(ResourceUpdate::getProd($ProdGrid[$Element]['production'][''.$res.'']));
-					
-                    $require	= $Prod - $Need;
-                    
-                    if(in_array($res, $reslist['resstype'][1])){
-                        $require	= round($require * $config->resource_multiplier);
-                    }
-                    if(in_array($res, $reslist['resstype'][2])){
-                        $require	= round($require * $config->energySpeed);
-                    }
+                    $Need		= eval(ResourceUpdate::getProd($ProdGrid[$Element]['production'][911]));
 
-                    
-                    if($require < 0) {
-                        if($Need < 0){$info_production[''.$res.'']	= sprintf($LNG['bd_need_engine'], pretty_number(abs($require)));}
+                    $BuildLevel	= $levelToBuild + 1;
+                    $Prod		= eval(ResourceUpdate::getProd($ProdGrid[$Element]['production'][911]));
+
+                    $requireEnergy	= $Prod - $Need;
+                    $requireEnergy	= round($requireEnergy * $config->energySpeed);
+
+                    if($requireEnergy < 0) {
+                        $infoEnergy	= sprintf($LNG['bd_need_engine'], pretty_number(abs($requireEnergy)), $LNG['tech'][911]);
                     } else {
-                        if($Need > 0){$info_production[''.$res.'']	= sprintf($LNG['bd_more_engine'], pretty_number(abs($require)));}
+                        $infoEnergy	= sprintf($LNG['bd_more_engine'], pretty_number(abs($requireEnergy)), $LNG['tech'][911]);
                     }
                 }
+
+                $costResources		= BuildFunctions::getElementPrice($USER, $PLANET, $Element, false, $levelToBuild+1);
+                $costOverflow		= BuildFunctions::getRestPrice($USER, $PLANET, $Element, $costResources);
+                $elementTime    	= BuildFunctions::getBuildingTime($USER, $PLANET, $Element, $costResources);
+                $destroyResources	= BuildFunctions::getElementPrice($USER, $PLANET, $Element, true);
+                $destroyTime		= BuildFunctions::getBuildingTime($USER, $PLANET, $Element, $destroyResources);
+                $destroyOverflow	= BuildFunctions::getRestPrice($USER, $PLANET, $Element, $destroyResources);
+                $buyable			= $QueueCount != 0 || BuildFunctions::isElementBuyable($USER, $PLANET, $Element, $costResources);
+
+                $BuildInfoList[$Element]	= array(
+                    'name'				=> $LNG['tech'][$Element] . (($levelToBuild>0) ? " (".$LNG['bd_lvl']." ".$levelToBuild.")" : ""),
+                    'level'				=> $PLANET[$resource[$Element]],
+                    'maxLevel'			=> $pricelist[$Element]['max'],
+                    'infoEnergy'		=> $infoEnergy,
+                    'costResources'		=> $costResources,
+                    'costOverflow'		=> $costOverflow,
+                    'elementTime'    	=> $elementTime,
+                    'destroyResources'	=> $destroyResources,
+                    'destroyTime'		=> $destroyTime,
+                    'destroyOverflow'	=> $destroyOverflow,
+                    'buyable'			=> $buyable,
+                    'levelToBuild'		=> $levelToBuild,
+                );
             }
-            
-            foreach($reslist['resstype'][1] as $res)
-            { 
-                $info_storage[''.$res.'']	= "";
-                
-                if(in_array($Element, $reslist['storage']))
+
+        }else{
+            $RoomIsOk 			= true;
+
+            $BuildInfoList      = array();
+
+            if($PLANET['tiles'][$tile]['id'] == 0){
+
+                $Elements			= $reslist['allow'][$PLANET['planet_type']];
+
+                foreach($Elements as $Element)
                 {
-                    $BuildLevel	= $PLANET[$resource[$Element]];
-                    $Need		= eval(ResourceUpdate::getProd($ProdGrid[$Element]['storage'][''.$res.'']));
-                                        
-                    $BuildLevel	= $levelToBuild + 1;
-                    $Prod		= eval(ResourceUpdate::getProd($ProdGrid[$Element]['storage'][''.$res.'']));
-					
-                    $require	= round(($Prod - $Need) * $config->storage_multiplier);
-                    
-                    if($require < 0) {
-                        if($Need < 0){$info_storage[''.$res.'']	= sprintf($LNG['bd_need_engine'], pretty_number(abs($require)));}
-                    } else {
-                        if($Need > 0){$info_storage[''.$res.'']	= sprintf($LNG['bd_more_engine'], pretty_number(abs($require)));}
+                    if (!BuildFunctions::isTechnologieAccessible($USER, $PLANET, $Element))
+                        continue;
+
+                    $infoEnergy	= "";
+
+                    if(isset($queueData['quickinfoTile'][$tile][$Element]))
+                    {
+                        $levelToBuild	= $queueData['quickinfoTile'][$tile][$Element];
                     }
+                    else
+                    {
+                        $levelToBuild	= 0;
+                    }
+
+                    $costResources		= BuildFunctions::getElementPrice($USER, $PLANET, $Element, false, $levelToBuild+1);
+                    $costOverflow		= BuildFunctions::getRestPrice($USER, $PLANET, $Element, $costResources);
+                    $elementTime    	= BuildFunctions::getBuildingTime($USER, $PLANET, $Element, $costResources);
+                    $destroyResources	= BuildFunctions::getElementPrice($USER, $PLANET, $Element, true);
+                    $destroyTime		= BuildFunctions::getBuildingTime($USER, $PLANET, $Element, $destroyResources);
+                    $destroyOverflow	= BuildFunctions::getRestPrice($USER, $PLANET, $Element, $destroyResources);
+                    $buyable			= $QueueCount != 0 || BuildFunctions::isElementBuyable($USER, $PLANET, $Element, $costResources);
+
+                    $BuildInfoList[$Element]	= array(
+                        'name'				=> $LNG['tech'][$Element],
+                        'image'				=> $THEME->getTheme().'gebaeude/'.$Element.'.gif',
+                        'level'				=> 0,
+                        'maxLevel'			=> $pricelist[$Element]['max'],
+                        'infoEnergy'		=> sprintf($LNG['bd_more_engine'], 0, $LNG['tech'][911]),
+                        'costResources'		=> $costResources,
+                        'costOverflow'		=> $costOverflow,
+                        'elementTime'    	=> $elementTime,
+                        'destroyResources'	=> $destroyResources,
+                        'destroyTime'		=> $destroyTime,
+                        'destroyOverflow'	=> $destroyOverflow,
+                        'buyable'			=> $buyable,
+                        'levelToBuild'		=> $levelToBuild,
+                    );
+                }
+            }else{
+                $Elements			= $reslist['allow'][$PLANET['planet_type']];
+
+                foreach($Elements as $Element)
+                {
+                    if (!BuildFunctions::isTechnologieAccessible($USER, $PLANET, $Element))
+                        continue;
+
+                    if($Element != $PLANET['tiles'][$tile]['build_id'])
+                        continue;
+
+                    $infoEnergy	= "";
+
+                    if(isset($queueData['quickinfoTile'][$tile][$Element]))
+                    {
+                        $levelToBuild	= $queueData['quickinfoTile'][$tile][$Element];
+                    }
+                    else
+                    {
+                        $levelToBuild	= $PLANET['tiles'][$tile]['build_lvl'];
+                    }
+
+                    $costResources		= BuildFunctions::getElementPrice($USER, $PLANET, $Element, false, $levelToBuild+1);
+                    $costOverflow		= BuildFunctions::getRestPrice($USER, $PLANET, $Element, $costResources);
+                    $elementTime    	= BuildFunctions::getBuildingTime($USER, $PLANET, $Element, $costResources);
+                    $destroyResources	= BuildFunctions::getElementPrice($USER, $PLANET, $Element, true);
+                    $destroyTime		= BuildFunctions::getBuildingTime($USER, $PLANET, $Element, $destroyResources);
+                    $destroyOverflow	= BuildFunctions::getRestPrice($USER, $PLANET, $Element, $destroyResources);
+                    $buyable			= $QueueCount != 0 || BuildFunctions::isElementBuyable($USER, $PLANET, $Element, $costResources);
+
+                    $BuildInfoList[$Element]	= array(
+                        'name'				=> $LNG['tech'][$Element]. " (".$LNG['bd_lvl']." ".$levelToBuild.")",
+                        'image'				=> $THEME->getTheme().'gebaeude/'.$Element.'.gif',
+                        'level'				=> $levelToBuild,
+                        'maxLevel'			=> $pricelist[$Element]['max'],
+                        'infoEnergy'		=> sprintf($LNG['bd_more_engine'], 0, $LNG['tech'][911]),
+                        'costResources'		=> $costResources,
+                        'costOverflow'		=> $costOverflow,
+                        'elementTime'    	=> $elementTime,
+                        'destroyResources'	=> $destroyResources,
+                        'destroyTime'		=> $destroyTime,
+                        'destroyOverflow'	=> $destroyOverflow,
+                        'buyable'			=> $buyable,
+                        'levelToBuild'		=> $levelToBuild,
+                    );
                 }
             }
-
-			$techTreeList		= BuildFunctions::requirementsList($USER, $PLANET, $Element);
-			$costResources		= BuildFunctions::getElementPrice($USER, $PLANET, $Element, false, $levelToBuild);
-			$costOverflow		= BuildFunctions::getRestPrice($USER, $PLANET, $Element, $costResources);
-			$elementTime    	= BuildFunctions::getBuildingTime($USER, $PLANET, $Element, $costResources);
-			$destroyResources	= BuildFunctions::getElementPrice($USER, $PLANET, $Element, true);
-			$destroyTime		= BuildFunctions::getBuildingTime($USER, $PLANET, $Element, $destroyResources);
-			$destroyOverflow	= BuildFunctions::getRestPrice($USER, $PLANET, $Element, $destroyResources);
-			$buyable			= $QueueCount != 0 || BuildFunctions::isElementBuyable($USER, $PLANET, $Element, $costResources);
-			
-			$BuildInfoList[$Element]	= array(
-				'level'					=> $PLANET[$resource[$Element]],
-				'maxLevel'				=> $pricelist[$Element]['max'],
-				'factor'				=> $pricelist[$Element]['factor'],
-				'costResources'		    => $costResources,
-				'costOverflow'			=> $costOverflow,
-				'elementTime'    		=> $elementTime,
-				'destroyResources'		=> $destroyResources,
-				'destroyTime'			=> $destroyTime,
-				'destroyOverflow'		=> $destroyOverflow,
-				'buyable'				=> $buyable,
-				'levelToBuild'			=> $levelToBuild,
-				'AllTech'				=> $techTreeList,
-				'techacc' 				=> BuildFunctions::isTechnologieAccessible($USER, $PLANET, $Element),
-                'ressources'		    => array_merge($reslist['resstype'][1], $reslist['resstype'][2]),
-                'storage'		        => $reslist['resstype'][1],
-			);
-            
-            foreach(array_merge($reslist['resstype'][1], $reslist['resstype'][2]) as $res)
-            { 
-                $class_production = 5000;
-                $id_class_production = $res + $class_production;
-                
-                $BuildInfoList[$Element]	+= array(
-                    ''.$id_class_production.''	    => $info_production[''.$res.''],
-                    'class_production'	            => $class_production,
-                );
-            }
-            
-            foreach($reslist['resstype'][1] as $res)
-            {   
-                $class_storage = 5100;
-                $id_class_storage = $res + $class_storage;
-                
-                $BuildInfoList[$Element]	+= array(
-                    ''.$id_class_storage.''	    => $info_storage[''.$res.''],
-                    'class_storage'	            => $class_storage,
-                );
-            }
-		}
+        }
 
 		$this->tplObj->loadscript('buildlist.js');
 		$this->assign(array(
@@ -499,6 +628,9 @@ class ShowBuildingsPage extends AbstractGamePage
 			'CanBuildElement'	    => $CanBuildElement,
 			'RoomIsOk'			    => $RoomIsOk,
 			'Queue'				    => $Queue,
+            'tile'				    => $tile,
+            'type'				    => $type,
+            'pageName'			    => $LNG['lm_buildings'],
 			'isBusy'			    => array('shipyard' => !empty($PLANET['b_hangar_id']), 'research' => $USER['b_tech_planet'] != 0),
             'need_dm'		        => floor(10 + ((400*($PLANET['b_building']-TIMESTAMP))/3600)),	
 			'field_used'		    => $PLANET['field_current'],

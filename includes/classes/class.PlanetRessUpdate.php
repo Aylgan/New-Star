@@ -32,6 +32,7 @@ class ResourceUpdate
 	private $PLANET			= array();
 	private $USER			= array();
 	private $Builded		= array();
+    private $BuildedTile	= array();
 
 	function __construct($Build = true, $Tech = true)
 	{
@@ -489,8 +490,82 @@ class ResourceUpdate
 	
 	private function BuildingQueue() 
 	{
-		$this->CheckPlanetBuildingQueue();
+        $this->CheckPlanetBuildingsNew();
 	}
+
+    private function CheckPlanetBuildingsNew()
+    {
+        global $resource, $reslist;
+
+        if (empty($this->PLANET['b_building_id']) || $this->PLANET['b_building'] > $this->TIME)
+            return false;
+
+        $CurrentQueue	= unserialize($this->PLANET['b_building_id']);
+
+        $b_building = 0;
+
+        foreach($CurrentQueue as $key => $builElem)
+        {
+            $Element      	= $builElem[0];
+            $BuildEndTime 	= $builElem[3];
+            $BuildMode    	= $builElem[4];
+            $tile			= $builElem[5];
+
+            if ($BuildEndTime > $this->TIME){
+                if($b_building == 0)
+                    $b_building = $BuildEndTime;
+                elseif($b_building > $BuildEndTime)
+                    $b_building = $BuildEndTime;
+
+                continue;
+            }
+
+            if(!isset($this->Builded[$Element]))
+                $this->Builded[$Element] = 0;
+
+            if(!isset($this->BuildedTile[$tile][$Element]))
+                $this->BuildedTile[$tile][$Element] = 0;
+
+            if ($BuildMode == 'build')
+            {
+                $this->PLANET['field_current']		+= 1;
+                $this->PLANET[$resource[$Element]]	+= 1;
+                $this->Builded[$Element]			+= 1;
+
+                $this->BuildedTile[$tile][$Element]			+= 1;
+            }
+            else
+            {
+                $this->PLANET['field_current'] 		-= 1;
+                $this->PLANET[$resource[$Element]] 	-= 1;
+                $this->Builded[$Element]			-= 1;
+
+                $this->BuildedTile[$tile][$Element]			-= 1;
+            }
+
+            unset($CurrentQueue[$key]);
+
+            $OnHash	= in_array($Element, $reslist['prod']);
+            $this->UpdateResource($BuildEndTime, !$OnHash);
+        }
+
+        $NewQueueArray	= array();
+
+        foreach($CurrentQueue as $ListIDArray) {
+            $NewQueueArray[]	= $ListIDArray;
+        }
+
+        if (count($NewQueueArray) == 0) {
+            $this->PLANET['b_building']    	= 0;
+            $this->PLANET['b_building_id'] 	= '';
+
+            return false;
+        } else {
+            $this->PLANET['b_building']    	= $b_building;
+            $this->PLANET['b_building_id'] 	= serialize($NewQueueArray);
+            return true;
+        }
+    }
 	
 	private function CheckPlanetBuildingQueue()
 	{
@@ -811,86 +886,48 @@ class ResourceUpdate
 	
 	public function SavePlanetToDB($USER = NULL, $PLANET = NULL)
 	{
-		global $resource, $reslist;
-		
-		if(is_null($USER))
-			global $USER;
-			
-		if(is_null($PLANET))
-			global $PLANET;
+        global $resource, $reslist;
 
-		$buildQueries	= array();
-        // $new_code
-		$params	= array(
-			':userId'				=> $USER['id'],
-			':planetId'				=> $PLANET['id'],
-			':ecoHash'				=> $PLANET['eco_hash'],
-			':lastUpdateTime'		=> $PLANET['last_update'],
-			':b_building'			=> $PLANET['b_building'],
-			':b_building_id' 		=> $PLANET['b_building_id'],
-			':field_current' 		=> $PLANET['field_current'],
-			':b_hangar_id'			=> $PLANET['b_hangar_id'],
-			':b_hangar'				=> $PLANET['b_hangar'],
-			':b_tech'				=> $USER['b_tech'],
-			':b_tech_id'			=> $USER['b_tech_id'],
-			':b_tech_planet'		=> $USER['b_tech_planet'],
-			':b_tech_queue'			=> $USER['b_tech_queue']
-		);
-        
-        foreach($reslist['resstype'][1] as $resP) //проверка всего масива элементов
-		{
-            $params	+= array(
-                ':'.$resource[$resP].''				=> $PLANET[''.$resource[$resP].''],
-                ':'.$resource[$resP].'_perhour'		=> $PLANET[''.$resource[$resP].'_perhour'],
-                ':'.$resource[$resP].'_max'			=> $PLANET[''.$resource[$resP].'_max']
-            );
-        }
+        if(is_null($USER))
+            global $USER;
 
-        foreach($reslist['resstype'][2] as $resS) //проверка всего масива элементов
-		{
-            $params	+= array(
-                ':'.$resource[$resS].'_used'		=> $PLANET[''.$resource[$resS].'_used'],
-                ':'.$resource[$resS].''				=> $PLANET[''.$resource[$resS].'']
-            );
-        }
-        
-        foreach($reslist['resstype'][3] as $resU) //проверка всего масива элементов
-		{
-            $params	+= array(
-                ':'.$resource[$resU].''			    => $USER[''.$resource[$resU].'']
-            );
-        }
-        //$new_code
-        /* $old_code
-		$params	= array(
-			':userId'				=> $USER['id'],
-			':planetId'				=> $PLANET['id'],
-			':metal'				=> $PLANET['metal'],
-			':crystal'				=> $PLANET['crystal'],
-			':deuterium'			=> $PLANET['deuterium'],
-			':ecoHash'				=> $PLANET['eco_hash'],
-			':lastUpdateTime'		=> $PLANET['last_update'],
-			':b_building'			=> $PLANET['b_building'],
-			':b_building_id' 		=> $PLANET['b_building_id'],
-			':field_current' 		=> $PLANET['field_current'],
-			':b_hangar_id'			=> $PLANET['b_hangar_id'],
-			':metal_perhour'		=> $PLANET['metal_perhour'],
-			':crystal_perhour'		=> $PLANET['crystal_perhour'],
-			':deuterium_perhour'	=> $PLANET['deuterium_perhour'],
-			':metal_max'			=> $PLANET['metal_max'],
-			':crystal_max'			=> $PLANET['crystal_max'],
-			':deuterium_max'		=> $PLANET['deuterium_max'],
-			':energy_used'			=> $PLANET['energy_used'],
-			':energy'				=> $PLANET['energy'],
-			':b_hangar'				=> $PLANET['b_hangar'],
-			':darkmatter'			=> $USER['darkmatter'],
-			':b_tech'				=> $USER['b_tech'],
-			':b_tech_id'			=> $USER['b_tech_id'],
-			':b_tech_planet'		=> $USER['b_tech_planet'],
-			':b_tech_queue'			=> $USER['b_tech_queue']
-		);
-        $old_code */
-		if (!empty($this->Builded))
+        if(is_null($PLANET))
+            global $PLANET;
+
+        $buildQueries	= array();
+
+        $buildTileQueries	= array();
+
+        $params	= array(
+            ':userId'				=> $USER['id'],
+            ':planetId'				=> $PLANET['id'],
+            ':metal'				=> $PLANET['metal'],
+            ':crystal'				=> $PLANET['crystal'],
+            ':deuterium'			=> $PLANET['deuterium'],
+            ':ecoHash'				=> $PLANET['eco_hash'],
+            ':lastUpdateTime'		=> $PLANET['last_update'],
+            ':b_building'			=> $PLANET['b_building'],
+            ':b_building_id' 		=> $PLANET['b_building_id'],
+            ':field_current' 		=> $PLANET['field_current'],
+            ':b_hangar_id'			=> $PLANET['b_hangar_id'],
+            ':metal_perhour'		=> $PLANET['metal_perhour'],
+            ':crystal_perhour'		=> $PLANET['crystal_perhour'],
+            ':deuterium_perhour'	=> $PLANET['deuterium_perhour'],
+            ':metal_max'			=> $PLANET['metal_max'],
+            ':crystal_max'			=> $PLANET['crystal_max'],
+            ':deuterium_max'		=> $PLANET['deuterium_max'],
+            ':energy_used'			=> $PLANET['energy_used'],
+            ':energy'				=> $PLANET['energy'],
+            ':b_hangar'				=> $PLANET['b_hangar'],
+            ':darkmatter'			=> $USER['darkmatter'],
+            ':b_tech'				=> $USER['b_tech'],
+            ':b_tech_id'			=> $USER['b_tech_id'],
+            ':b_tech_planet'		=> $USER['b_tech_planet'],
+            ':b_tech_queue'			=> $USER['b_tech_queue']
+        );
+
+
+        if (!empty($this->Builded))
 		{
 			foreach($this->Builded as $Element => $Count)
 			{
@@ -917,48 +954,46 @@ class ResourceUpdate
 				}
 			}
 		}
-        // $new_code
+        $tSql = "";
+        $tparams = array();
+        if (!empty($this->BuildedTile))
+        {
+            foreach($this->BuildedTile as $tileId => $tile){
+                foreach($tile as $element => $level){
+
+                    if($PLANET['tiles'][$tileId]['build_id'] == 0){
+                        $QueryData	= array();
+
+                        $QueryData[]	=	$PLANET['id'];
+                        $QueryData[]	=	$element;
+                        $QueryData[]	=	1;
+                        $QueryData[]	=	$tileId;
+
+                        $tSql	.= "INSERT INTO %%BUILDS%% (planet, build_id, build_lvl, tile) VALUES (".implode(", ", $QueryData).");";
+                    }else{
+
+                        $tparams	= array(
+                            ':blvl' => $PLANET['tiles'][$tileId]['build_lvl'] + 1,
+                            ':planetId' => $PLANET['id'],
+                            ':tile' => $tileId
+                        );
+
+                        $PLANET['tiles'][$tileId]['build_lvl'] = $tparams[':blvl'];
+
+                        $tSql	.= "UPDATE %%BUILDS%% SET build_lvl = ".$tparams[':blvl']." WHERE planet = ".$tparams[':planetId']." AND tile = ".$tparams[':tile'].";";
+                    }
+                }
+            }
+        }
+
+
+
+        if($tSql != ""){
+            Database::get()->nativeQuery($tSql);
+        }
+
+
         $sql = 'UPDATE %%PLANETS%% as p,%%USERS%% as u SET
-            p.eco_hash			= :ecoHash,
-            p.last_update		= :lastUpdateTime,
-            p.b_building		= :b_building,
-            p.b_building_id 	= :b_building_id,
-            p.field_current 	= :field_current,
-            p.b_hangar_id		= :b_hangar_id,
-            p.b_hangar			= :b_hangar,
-            u.b_tech			= :b_tech,
-            u.b_tech_id			= :b_tech_id,
-            u.b_tech_planet		= :b_tech_planet,
-            u.b_tech_queue		= :b_tech_queue
-		'.implode("\n", $buildQueries).'
-		WHERE p.id = :planetId AND u.id = :userId;';
-        
-        foreach($reslist['resstype'][1] as $resP) //проверка всего масива элементов
-		{
-                $sql .= 'UPDATE %%PLANETS%% as p,%%USERS%% as u SET
-                p.'.$resource[$resP].'				= :'.$resource[$resP].',
-                p.'.$resource[$resP].'_perhour		= :'.$resource[$resP].'_perhour,
-                p.'.$resource[$resP].'_max			= :'.$resource[$resP].'_max
-            WHERE p.id = :planetId AND u.id = :userId;';
-        }
-        
-        foreach($reslist['resstype'][2] as $resS) //проверка всего масива элементов
-		{
-                $sql .= 'UPDATE %%PLANETS%% as p,%%USERS%% as u SET
-                p.'.$resource[$resS].'_used		    = :'.$resource[$resS].'_used,
-                p.'.$resource[$resS].'			    = :'.$resource[$resS].'
-            WHERE p.id = :planetId AND u.id = :userId;';
-        }
-        
-        foreach($reslist['resstype'][3] as $resU) //проверка всего масива элементов
-		{
-                $sql .= 'UPDATE %%PLANETS%% as p,%%USERS%% as u SET
-                u.'.$resource[$resU].'		        = :'.$resource[$resU].'
-            WHERE p.id = :planetId AND u.id = :userId;';
-        }
-        // $new_code
-        /* $old_code
-		$sql = 'UPDATE %%PLANETS%% as p,%%USERS%% as u SET
 		p.metal				= :metal,
 		p.crystal			= :crystal,
 		p.deuterium			= :deuterium,
@@ -984,11 +1019,11 @@ class ResourceUpdate
 		u.b_tech_queue		= :b_tech_queue
 		'.implode("\n", $buildQueries).'
 		WHERE p.id = :planetId AND u.id = :userId;';
-        $old_code */
-		Database::get()->update($sql, $params);
 
-		$this->Builded	= array();
+        Database::get()->update($sql, $params);
 
-		return array($USER, $PLANET);
+        $this->Builded	= array();
+
+        return array($USER, $PLANET);
 	}
 }
