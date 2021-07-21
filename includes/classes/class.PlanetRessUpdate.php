@@ -489,8 +489,7 @@ class ResourceUpdate
 	
 	private function BuildingQueue() 
 	{
-		while($this->CheckPlanetBuildingQueue())
-			$this->SetNextQueueElementOnTop();
+		$this->CheckPlanetBuildingQueue();
 	}
 	
 	private function CheckPlanetBuildingQueue()
@@ -509,31 +508,57 @@ class ResourceUpdate
 		if(!isset($this->Builded[$Element]))
 			$this->Builded[$Element] = 0;
         
-		if ($BuildMode == 'build')
+		foreach($CurrentQueue as $key => $builElem)
 		{
-			$this->PLANET['field_current']		+= 1;
-			$this->PLANET[$resource[$Element]]	+= 1;
-			$this->Builded[$Element]			+= 1;
-		}
-		else
-		{
-			$this->PLANET['field_current'] 		-= 1;
-			$this->PLANET[$resource[$Element]] 	-= 1;
-			$this->Builded[$Element]			-= 1;
-		}
-	
+			$Element      	= $builElem[0];
+			$BuildEndTime 	= $builElem[3];
+			$BuildMode    	= $builElem[4];
 
-		array_shift($CurrentQueue);
-		$OnHash	= in_array($Element, $reslist['prod']);
-		$this->UpdateResource($BuildEndTime, !$OnHash);			
-			
-		if (count($CurrentQueue) == 0) {
+			if ($BuildEndTime > $this->TIME){	
+				if($b_building == 0)
+					$b_building = $BuildEndTime;
+				elseif($b_building > $BuildEndTime)
+					$b_building = $BuildEndTime;
+
+				continue;
+			}
+
+			if(!isset($this->Builded[$Element]))
+				$this->Builded[$Element] = 0;
+
+			if ($BuildMode == 'build')
+			{
+				$this->PLANET['field_current']		+= 1;
+				$this->PLANET[$resource[$Element]]	+= 1;
+				$this->Builded[$Element]			+= 1;
+			}
+			else
+			{
+				$this->PLANET['field_current'] 		-= 1;
+				$this->PLANET[$resource[$Element]] 	-= 1;
+				$this->Builded[$Element]			-= 1;
+			}
+
+			unset($CurrentQueue[$key]);
+
+			$OnHash	= in_array($Element, $reslist['prod']);
+			$this->UpdateResource($BuildEndTime, !$OnHash);		
+		}
+
+		$NewQueueArray	= array();
+
+		foreach($CurrentQueue as $ListIDArray) {
+			$NewQueueArray[]	= $ListIDArray;	
+		}
+
+		if (count($NewQueueArray) == 0) {
 			$this->PLANET['b_building']    	= 0;
 			$this->PLANET['b_building_id'] 	= '';
 
 			return false;
 		} else {
-			$this->PLANET['b_building_id'] 	= serialize($CurrentQueue);
+			$this->PLANET['b_building'] 	= $b_building;
+			$this->PLANET['b_building_id'] 	= serialize($NewQueueArray);
 			return true;
 		}
 	}	
