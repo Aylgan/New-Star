@@ -478,7 +478,7 @@ abstract class AbstractGamePage
 	}
 
     protected function data($data) {
-
+        $this->save();
         echo json_encode($data, true);
         exit;
     }

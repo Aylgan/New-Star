@@ -262,6 +262,8 @@ class ShowBuildingsPage extends AbstractGamePage
         }
 
         $PLANET['b_building']		= $BuildEndTime;
+
+        $this->data(array($PLANET['b_building_id']));
 	}
 	 
 	private function DoAddBuildingToQueue($Element, $AddMode = true)
@@ -347,45 +349,57 @@ class ShowBuildingsPage extends AbstractGamePage
 		$PLANET['b_building']		= $BuildEndTime;
     }
 
-	private function getQueueData()
-	{
-		global $LNG, $PLANET, $USER;
-		
-		$scriptData		= array();
-		$quickinfo		= array();
-		
-		if ($PLANET['b_building'] == 0 || $PLANET['b_building_id'] == "")
-			return array('queue' => $scriptData, 'quickinfo' => $quickinfo);
-		
-		$buildQueue		= unserialize($PLANET['b_building_id']);
-		
-		foreach($buildQueue as $BuildArray) {
-			if ($BuildArray[3] < TIMESTAMP)
-				continue;
-			
-			$quickinfo[$BuildArray[0]]	= $BuildArray[1];
-			
-			if ($PLANET['planet_type']==3){
-				$dm_fast = floor(1000*($BuildArray[3]-TIMESTAMP)/3600);
-			}
-			else{
-				$dm_fast = floor(200*($BuildArray[3]-TIMESTAMP)/3600);
-			}
+    private function getQueueData()
+    {
+        global $LNG, $PLANET, $USER, $resource;
 
-			$scriptData[$BuildArray[0]] = array(
-				'element'	=> $BuildArray[0], 
-				'level' 	=> $BuildArray[1], 
-				'time' 		=> $BuildArray[2], 
-				'resttime' 	=> ($BuildArray[3] - TIMESTAMP), 
-				'destroy' 	=> ($BuildArray[4] == 'destroy'), 
-				'endtime' 	=> _date('U', $BuildArray[3], $USER['timezone']),
-				'display' 	=> _date($LNG['php_tdformat'], $BuildArray[3], $USER['timezone']),
-				'need_dm' 	=> $dm_fast,
-			);
-		}
-		
-		return array('queue' => $scriptData, 'quickinfo' => $quickinfo);
-	}
+        $scriptData		= array();
+        $quickinfo		= array();
+        $quickinfoTile		= array();
+
+        if ($PLANET['b_building'] == 0 || $PLANET['b_building_id'] == "")
+            return array('queue' => $scriptData, 'quickinfo' => $quickinfo, 'quickinfoTile' => $quickinfoTile);
+
+        $buildQueue		= unserialize($PLANET['b_building_id']);
+
+        function cmp($a, $b)
+        {
+            return strcmp($a[3], $b[3]);
+        }
+
+        usort($buildQueue, "cmp");
+
+        foreach($buildQueue as $BuildArray) {
+            if ($BuildArray[3] < TIMESTAMP)
+                continue;
+
+            $quickinfo[$BuildArray[0]]	= $BuildArray[1];
+
+            $quickinfoTile[$BuildArray[5]][$BuildArray[0]]		= $BuildArray[1];
+
+            if ($PLANET['planet_type']==3){
+                $dm_fast = floor(1000*($BuildArray[3]-TIMESTAMP)/3600);
+            }
+            else{
+                $dm_fast = floor(200*($BuildArray[3]-TIMESTAMP)/3600);
+            }
+
+            $scriptData[] = array(
+                'element'	=> $BuildArray[0],
+                'name'      => $LNG['tech'][$BuildArray[0]],
+                'level' 	=> $BuildArray[1],
+                'time' 		=> $BuildArray[2],
+                'resttime' 	=> ($BuildArray[3] - TIMESTAMP),
+                'destroy' 	=> ($BuildArray[4] == 'destroy'),
+                'endtime' 	=> _date('U', $BuildArray[3], $USER['timezone']),
+                'display' 	=> _date($LNG['php_tdformat'], $BuildArray[3], $USER['timezone']),
+                'need_dm' 	=> $dm_fast,
+                'tile'      => $BuildArray[5],
+            );
+        }
+
+        return array('queue' => $scriptData, 'quickinfo' => $quickinfo, 'quickinfoTile' => $quickinfoTile);
+    }
 	
 	private static function getHighestLevelOfElement($QueueList, $ElementID, $default){
 		$level = $default;
@@ -406,11 +420,19 @@ class ShowBuildingsPage extends AbstractGamePage
         $this->data($data);
     }
 
+    public function queue()
+    {
+        $queueData	 		= $this->getQueueData();
+        $Queue	 			= $queueData['queue'];
+
+        $this->data($Queue);
+    }
+
 	public function show()
 	{
 		global $ProdGrid, $LNG, $resource, $reslist, $PLANET, $USER, $pricelist, $requeriments, $THEME;
 		
-		$TheCommand		= HTTP::_GP('cmd', '');
+		$TheCommand		= HTTP::_JSON('cmd', '');
 
         $type			= HTTP::_JSON('type', 'normal');
         $tile			= HTTP::_JSON('tile', 1);
@@ -418,7 +440,7 @@ class ShowBuildingsPage extends AbstractGamePage
 		// wellformed buildURLs
 		if(!empty($TheCommand) && $_SERVER['REQUEST_METHOD'] === 'POST' && $USER['urlaubs_modus'] == 0)
 		{
-			$Element     	= HTTP::_GP('building', 0);
+			$Element     	= HTTP::_JSON('building', 0);
 			$ListID      	= HTTP::_GP('listid', 0);
 			/*
 			$lvlup      			= HTTP::_GP('lvlup', 0);
@@ -441,8 +463,8 @@ class ShowBuildingsPage extends AbstractGamePage
 				    $this->FastBuildingFromQueue($Element);
 				break;
 			}
-			
-			$this->redirectTo('game.php?page=overview');
+
+            $this->data(true);
 		}
         $config				= Config::get();
 

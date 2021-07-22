@@ -174,47 +174,6 @@ class ResourceUpdate
             
             $this->PLANET[''.$resource[$resP].'']	   = max($this->PLANET[''.$resource[$resP].''], 0);
         }
-        // $new_code
-		/* $old_code
-		$MaxMetalStorage		= $this->PLANET['metal_max']     * $this->config->max_overflow;
-		$MaxCristalStorage		= $this->PLANET['crystal_max']   * $this->config->max_overflow;
-		$MaxDeuteriumStorage	= $this->PLANET['deuterium_max'] * $this->config->max_overflow;
-		
-		$MetalTheoretical		= $this->ProductionTime * (($this->config->metal_basic_income * $this->config->resource_multiplier) + $this->PLANET['metal_perhour']) / 3600;
-		
-		if($MetalTheoretical < 0)
-		{
-			$this->PLANET['metal']      = max($this->PLANET['metal'] + $MetalTheoretical, 0);
-		} 
-		elseif ($this->PLANET['metal'] <= $MaxMetalStorage)
-		{
-			$this->PLANET['metal']      = min($this->PLANET['metal'] + $MetalTheoretical, $MaxMetalStorage);
-		}
-		
-		$CristalTheoretical	= $this->ProductionTime * (($this->config->crystal_basic_income * $this->config->resource_multiplier) + $this->PLANET['crystal_perhour']) / 3600;
-		if ($CristalTheoretical < 0)
-		{
-			$this->PLANET['crystal']      = max($this->PLANET['crystal'] + $CristalTheoretical, 0);
-		} 
-		elseif ($this->PLANET['crystal'] <= $MaxCristalStorage ) 
-		{
-			$this->PLANET['crystal']      = min($this->PLANET['crystal'] + $CristalTheoretical, $MaxCristalStorage);
-		}
-		
-		$DeuteriumTheoretical	= $this->ProductionTime * (($this->config->deuterium_basic_income * $this->config->resource_multiplier) + $this->PLANET['deuterium_perhour']) / 3600;
-		if ($DeuteriumTheoretical < 0)
-		{
-			$this->PLANET['deuterium']    = max($this->PLANET['deuterium'] + $DeuteriumTheoretical, 0);
-		} 
-		elseif($this->PLANET['deuterium'] <= $MaxDeuteriumStorage) 
-		{
-			$this->PLANET['deuterium']    = min($this->PLANET['deuterium'] + $DeuteriumTheoretical, $MaxDeuteriumStorage);
-		}
-		
-		$this->PLANET['metal']		= max($this->PLANET['metal'], 0);
-		$this->PLANET['crystal']	= max($this->PLANET['crystal'], 0);
-		$this->PLANET['deuterium']	= max($this->PLANET['deuterium'], 0);
-        $old_code */
 	}
 	
 	public static function getProd($Calculation)
@@ -247,31 +206,7 @@ class ResourceUpdate
 
 		return $researchLevelList;
 	}
-    // $new_code
-    /* $old_code
-    public static function getNetworkLevel($USER, $PLANET)
-	{
-		global $resource;
 
-		$researchLevelList	= array($PLANET[$resource[31]]);
-		if($USER[$resource[123]] > 0)
-		{
-			$sql = 'SELECT '.$resource[31].' FROM %%PLANETS%% WHERE id != :planetId AND id_owner = :userId AND destruyed = 0 ORDER BY '.$resource[31].' DESC LIMIT :limit;';
-			$researchResult = Database::get()->select($sql, array(
-				':limit'	=> (int) $USER[$resource[123]],
-				':planetId'	=> $PLANET['id'],
-				':userId'	=> $USER['id']
-			));
-
-			foreach($researchResult as $researchRow)
-			{
-				$researchLevelList[]	= $researchRow[$resource[31]];
-			}
-		}
-		
-		return $researchLevelList;
-	}
-    $old_code */
 	public function ReBuildCache()
 	{
         // $new_code
@@ -290,43 +225,9 @@ class ResourceUpdate
         
         include('includes/subclasses/subclass.Temp.php');
         
-        // $new_code
-		/* $old_code
-        global $ProdGrid, $resource, $reslist;
-		
-		if ($this->PLANET['planet_type'] == 3)
-		{
-			$this->config->metal_basic_income     	= 0;
-			$this->config->crystal_basic_income   	= 0;
-			$this->config->deuterium_basic_income 	= 0;
-		}
         
-		$temp	= array(
-			901	=> array(
-				'max'	=> 0,
-				'plus'	=> 0,
-				'minus'	=> 0,
-			),
-			902	=> array(
-				'max'	=> 0,
-				'plus'	=> 0,
-				'minus'	=> 0,
-			),
-			903	=> array(
-				'max'	=> 0,
-				'plus'	=> 0,
-				'minus'	=> 0,
-			),
-			911	=> array(
-				'plus'	=> 0,
-				'minus'	=> 0,
-			)
-		);
-		$old_code */
 		$BuildTemp		= $this->PLANET['temp_max'];
-        /* $old_code
-		$BuildEnergy	= $this->USER[$resource[113]];
-		$old_code */
+       
 		foreach($reslist['storage'] as $ProdID)
 		{
 			foreach($reslist['resstype'][1] as $ID) 
@@ -343,25 +244,30 @@ class ResourceUpdate
 		
 		foreach($reslist['prod'] as $ProdID)
 		{	
-			$BuildLevelFactor	= $this->PLANET[$resource[$ProdID].'_porcent'];
-			$BuildLevel 		= $this->PLANET[$resource[$ProdID]];
-			
-			foreach($ressIDs as $ID) 
-			{
-				if(!isset($ProdGrid[$ProdID]['production'][$ID]))
-					continue;
-				
-				$Production	= eval(self::getProd($ProdGrid[$ProdID]['production'][$ID]));
-				
-				if($Production > 0) {					
-					$temp[$ID]['plus']	+= $Production;
-				} else {
-					if(in_array($ID, $reslist['resstype'][1]) && $this->PLANET[$resource[$ID]] == 0) {
-						 continue;
-					}
+			foreach($this->PLANET['tiles'] as $tile){
+				if($tile['build_id'] != 0 && $tile['build_lvl'] != 0 && $tile['build_id'] == $ProdID){
+					$BuildLevelFactor	= 10;
+					$BuildLevel 		= $tile['build_lvl'];
 					
-					$temp[$ID]['minus']	+= $Production;
+					foreach($ressIDs as $ID) 
+					{
+						if(!isset($ProdGrid[$ProdID]['production'][$ID]))
+							continue;
+						
+						$Production	= eval(self::getProd($ProdGrid[$ProdID]['production'][$ID]));
+						
+						if($Production > 0) {					
+							$temp[$ID]['plus']	+= $Production;
+						} else {
+							if(in_array($ID, $reslist['resstype'][1]) && $this->PLANET[$resource[$ID]] == 0) {
+								 continue;
+							}
+							
+							$temp[$ID]['minus']	+= $Production;
+						}
+					}
 				}
+				
 			}
 		}
         
@@ -386,40 +292,6 @@ class ResourceUpdate
                 }
             }
         }
-        /*
-        foreach($reslist['resstype'][1] as $resP) //проверка всего масива элементов
-		{
-            $this->PLANET[''.$resource[$resP].'_max']		= $temp[$resP]['max'] * $this->config->storage_multiplier * (1 + $this->USER['factor']['ResourceStorage']);
-           
-            $this->PLANET[''.$resource[$resP].'_perhour']		= ($temp[$resP]['plus'] * (1 + $this->USER['factor']['Resource'] + $this->USER['factor']['P'.$resource[$resP].'']) * $prodLevel + $temp[$resP]['minus']) * $this->config->resource_multiplier;  
-        }
-        
-        foreach($reslist['resstype'][2] as $resS) //проверка всего масива элементов
-        {
-            $this->PLANET[''.$resource[$resS].'']				= round($temp[$resS]['plus'] * $this->config->energySpeed * (1 + $this->USER['factor']['S'.$resource[$resS].''])); 
-            $this->PLANET[''.$resource[$resS].'_used']		    = $temp[$resS]['minus'] * $this->config->energySpeed;
-        }
-       
-        // $new_code
-        /* $old_code
-		$this->PLANET['metal_max']			= $temp[901]['max'] * $this->config->storage_multiplier * (1 + $this->USER['factor']['ResourceStorage']);
-		$this->PLANET['crystal_max']		= $temp[902]['max'] * $this->config->storage_multiplier * (1 + $this->USER['factor']['ResourceStorage']);
-		$this->PLANET['deuterium_max']		= $temp[903]['max'] * $this->config->storage_multiplier * (1 + $this->USER['factor']['ResourceStorage']);
-
-		$this->PLANET['energy']				= round($temp[911]['plus'] * $this->config->energySpeed * (1 + $this->USER['factor']['Energy']));
-		$this->PLANET['energy_used']		= $temp[911]['minus'] * $this->config->energySpeed;
-		if($this->PLANET['energy_used'] == 0) {
-			$this->PLANET['metal_perhour']		= 0;
-			$this->PLANET['crystal_perhour']	= 0;
-			$this->PLANET['deuterium_perhour']	= 0;
-		} else {
-			$prodLevel	= min(1, $this->PLANET['energy'] / abs($this->PLANET['energy_used']));
-			
-			$this->PLANET['metal_perhour']		= ($temp[901]['plus'] * (1 + $this->USER['factor']['Resource'] + 0.02 * $this->USER[$resource[131]]) * $prodLevel + $temp[901]['minus']) * $this->config->resource_multiplier;
-			$this->PLANET['crystal_perhour']	= ($temp[902]['plus'] * (1 + $this->USER['factor']['Resource'] + 0.02 * $this->USER[$resource[132]]) * $prodLevel + $temp[902]['minus']) * $this->config->resource_multiplier;
-			$this->PLANET['deuterium_perhour']	= ($temp[903]['plus'] * (1 + $this->USER['factor']['Resource'] + 0.02 * $this->USER[$resource[133]]) * $prodLevel + $temp[903]['minus']) * $this->config->resource_multiplier;
-		}
-        $old_code */
 	}
 	
 	private function ShipyardQueue()
