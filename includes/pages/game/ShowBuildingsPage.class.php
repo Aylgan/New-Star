@@ -471,7 +471,7 @@ class ShowBuildingsPage extends AbstractGamePage
 				break;
 			}
 
-            exit();
+            $this->queue();
 		}
         $config				= Config::get();
 
