@@ -230,9 +230,6 @@ function getPlanetTiles($PLANET)
 {
     global $LNG;
 
-    if(isset($PLANET['tiles']))
-        return $PLANET['tiles'];
-
     $sql = "SELECT *
 			FROM %%BUILDS%% WHERE planet = :planetId";
 

@@ -33,19 +33,11 @@ abstract class AbstractGamePage
 	public $jsonArr = [];
 
 	protected function __construct() {
-
-		if(!AJAX_REQUEST)
-		{
-			$this->setWindow('full');
-			if(!$this->disableEcoSystem)
-			{
-				$this->ecoObj	= new ResourceUpdate();
-				$this->ecoObj->CalcResource();
-			}
-			$this->initTemplate();
-		} else {
-			$this->setWindow('ajax');
-		}
+        if(!$this->disableEcoSystem)
+        {
+            $this->ecoObj	= new ResourceUpdate();
+            $this->ecoObj->CalcResource();
+        }
 	}
 
 	protected function initTemplate() {
@@ -499,8 +491,6 @@ abstract class AbstractGamePage
             //Стандартные перменные
 			'lang'    		=> $LNG->getLanguage(),
 			'dpath'			=> $THEME->getTheme(),
-			'scripts'		=> $this->tplObj->jsscript,
-			'execscript'	=> implode("\n", $this->tplObj->script),
 			'basepath'		=> PROTOCOL.HTTP_HOST.HTTP_BASE,
 		));
 

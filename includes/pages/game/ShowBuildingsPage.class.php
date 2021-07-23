@@ -222,7 +222,12 @@ class ShowBuildingsPage extends AbstractGamePage
         if($type == 'normal')
             $BuildLevel			= $PLANET[$resource[$Element]] + (int) $AddMode;
         else{
-            $BuildLevel			= $PLANET['tiles'][$tile]['build_lvl'] + (int) $AddMode;
+            if($AddMode) {
+                $BuildLevel = $PLANET['tiles'][$tile]['build_lvl'] + 1;
+            }else{
+                $BuildLevel			= max($PLANET['tiles'][$tile]['build_lvl'] - 1, 0);
+            }
+
 
             if($PLANET['tiles'][$tile]['build_id'] != 0 && $PLANET['tiles'][$tile]['build_id'] != $Element)
                 return;
@@ -263,7 +268,7 @@ class ShowBuildingsPage extends AbstractGamePage
 
         $PLANET['b_building']		= $BuildEndTime;
 
-        $this->data(array($PLANET['b_building_id']));
+        $this->queue();
 	}
 	 
 	private function DoAddBuildingToQueue($Element, $AddMode = true)
@@ -418,6 +423,7 @@ class ShowBuildingsPage extends AbstractGamePage
         $data = $PLANET['tiles'];
 
         $this->data($data);
+        exit();
     }
 
     public function queue()
@@ -426,6 +432,7 @@ class ShowBuildingsPage extends AbstractGamePage
         $Queue	 			= $queueData['queue'];
 
         $this->data($Queue);
+        exit();
     }
 
 	public function show()
@@ -464,7 +471,7 @@ class ShowBuildingsPage extends AbstractGamePage
 				break;
 			}
 
-            $this->data(true);
+            exit();
 		}
         $config				= Config::get();
 
@@ -643,7 +650,6 @@ class ShowBuildingsPage extends AbstractGamePage
             }
         }
 
-		$this->tplObj->loadscript('buildlist.js');
 		$this->assign(array(
             'HaveMissiles'		    => (bool) $PLANET[$resource[503]] + $PLANET[$resource[502]],
 			'BuildInfoList'		    => $BuildInfoList,
