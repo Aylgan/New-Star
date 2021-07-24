@@ -65,6 +65,12 @@ class ResourceUpdate
 	public function CreateHash() {
 		global $reslist, $resource;
 		$Hash	= array();
+
+
+        foreach ($this->PLANET['tiles'] as $tile => $buildElem){
+            $Hash[] = $buildElem['build_lvl'];
+        }
+
 		foreach($reslist['prod'] as $ID) {
 			$Hash[]	= $this->PLANET[$resource[$ID]];
 			$Hash[]	= $this->PLANET[$resource[$ID].'_porcent'];
@@ -117,7 +123,6 @@ class ResourceUpdate
 			if($this->Tech == true && $this->USER['b_tech'] != 0 && $this->USER['b_tech'] < $this->TIME)
 				$this->ResearchQueue();
 		}
-		
 		$this->UpdateResource($this->TIME, $HASH);
 			
 		if($SAVE === true)
@@ -212,7 +217,7 @@ class ResourceUpdate
 	{
         // $new_code
 		global $ProdGrid, $resource, $reslist, $resglobal;
-        
+
         foreach($reslist['planet_no_basic'] as $planetNoBasic) 
         {
             if ($this->PLANET['planet_type'] == $planetNoBasic)
@@ -259,8 +264,9 @@ class ResourceUpdate
 						
 						if($Production > 0) {					
 							$temp[$ID]['plus']	+= $Production;
-                            if(isset($temp[$ID]['max']))
-                            $temp[$ID]['max']	+= $Production * 3 * 24;
+                            if(isset($temp[$ID]['max'])) {
+                                $temp[$ID]['max'] += $Production * 3 * 24;
+                            }
 						} else {
 							if(in_array($ID, $reslist['resstype'][1]) && $this->PLANET[$resource[$ID]] == 0) {
 								 continue;
