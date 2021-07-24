@@ -182,18 +182,60 @@ class ShowBuildingsPage extends AbstractGamePage
 
 	private function AddBuildingToQueue($Element, $AddMode = true, $tile = 0, $type = 'normal')
 	{
-        global $PLANET, $USER, $resource, $reslist, $pricelist;
+        global $PLANET, $USER, $resource, $reslist, $pricelist, $LNG;
 
-        if(!in_array($Element, $reslist['allow'][$PLANET['planet_type']])
-            || !BuildFunctions::isTechnologieAccessible($USER, $PLANET, $Element)
-            || ($Element == 31 && $USER["b_tech_planet"] != 0)
-            || (($Element == 15 || $Element == 21) && !empty($PLANET['b_hangar_id']))
-            || (!$AddMode && $PLANET[$resource[$Element]] == 0
-            || $tile == 0
-            || $PLANET['tiles'][$tile]['build_end_time'] > 0
-            || ($PLANET['tiles'][$tile]['build_id'] != 0 && $PLANET['tiles'][$tile]['build_id'] != $Element))
-        )
-            return;
+
+
+        if(!in_array($Element, $reslist['allow'][$PLANET['planet_type']]))
+        {
+            return array(
+                'type'  => 'error',
+                'title' => 'Постройки',
+                'message'   => 'На данной планете невозможно построить '.$LNG['tech'][$Element]
+            );
+        }
+        if(!BuildFunctions::isTechnologieAccessible($USER, $PLANET, $Element)){
+            return array(
+                'type'  => 'error',
+                'title' => 'Постройки',
+                'message'   => 'На данной планете невозможно построить '.$LNG['tech'][$Element]
+            );
+        }
+        if($Element == 31 && $USER["b_tech_planet"] != 0){
+            return array(
+                'type'  => 'error',
+                'title' => 'Постройки',
+                'message'   => 'Строительство '.$LNG['tech'][$Element].' невозможно, пока идет исследование.'
+            );
+        }
+        if(($Element == 15 || $Element == 21) && !empty($PLANET['b_hangar_id'])){
+            return array(
+                'type'  => 'error',
+                'title' => 'Постройки',
+                'message'   => 'Строительство '.$LNG['tech'][$Element].' невозможно, строятся корабли.'
+            );
+        }
+        if($tile == 0){
+            return array(
+                'type'  => 'error',
+                'title' => 'Постройки',
+                'message'   => 'Слот для строительства не выбран'
+            );
+        }
+        if($PLANET['tiles'][$tile]['build_end_time'] > 0){
+            return array(
+                'type'  => 'error',
+                'title' => 'Постройки',
+                'message'   => $LNG['tech'][$Element].' уже строится.'
+            );
+        }
+        if($PLANET['tiles'][$tile]['build_id'] != 0 && $PLANET['tiles'][$tile]['build_id'] != $Element){
+            return array(
+                'type'  => 'error',
+                'title' => 'Постройки',
+                'message'   => 'Место уже занято.'
+            );
+        }
 
         $BuildMode 			= $AddMode ? 'build' : 'destroy';
 
@@ -207,13 +249,23 @@ class ShowBuildingsPage extends AbstractGamePage
             }
         }
 
-        if($pricelist[$Element]['max'] < $BuildLevel)
-            return;
+        if($pricelist[$Element]['max'] < $BuildLevel){
+            return array(
+                'type'  => 'error',
+                'title' => 'Постройки',
+                'message'   => 'Достигнут максимум.'
+            );
+        }
 
         $costResources		= BuildFunctions::getElementPrice($USER, $PLANET, $Element, !$AddMode, $BuildLevel);
 
-        if(!BuildFunctions::isElementBuyable($USER, $PLANET, $Element, $costResources))
-            return;
+        if(!BuildFunctions::isElementBuyable($USER, $PLANET, $Element, $costResources)){
+            return array(
+                'type'  => 'error',
+                'title' => 'Постройки',
+                'message'   => 'Не хватает ресурсов'
+            );
+        }
 
         if(isset($costResources[901])) { $PLANET[$resource[901]]	-= $costResources[901]; }
         if(isset($costResources[902])) { $PLANET[$resource[902]]	-= $costResources[902]; }
@@ -228,7 +280,11 @@ class ShowBuildingsPage extends AbstractGamePage
         $PLANET['tiles'][$tile]['build_mode']       = $BuildMode;
         $PLANET['tiles'][$tile]['isUpdate']         = true;
 
-        $this->queue();
+        return array(
+            'type'  => 'info',
+            'title' => 'Постройки',
+            'message'   => $AddMode ? 'Началось строительство '.$LNG['tech'][$Element].' '.$BuildLevel : 'Началось разрушение '.$LNG['tech'][$Element].' '.($BuildLevel+1)
+        );
 	}
 	 
 	private function DoAddBuildingToQueue($Element, $AddMode = true)
@@ -420,20 +476,22 @@ class ShowBuildingsPage extends AbstractGamePage
 			switch($TheCommand)
 			{
 				case 'cancel':
-					$this->CancelBuildingFromQueue();
+                    $message = $this->CancelBuildingFromQueue();
 				break;
 				case 'insert':
-					$this->AddBuildingToQueue($Element, true, $tile, $type);
+                    $message = $this->AddBuildingToQueue($Element, true, $tile, $type);
 				break;
 				case 'destroy':
-					$this->AddBuildingToQueue($Element, false, $tile, $type);
+                    $message = $this->AddBuildingToQueue($Element, false, $tile, $type);
 				break;
 				case 'fast':
-				    $this->FastBuildingFromQueue($Element);
+                    $message = $this->FastBuildingFromQueue($Element);
 				break;
 			}
 
-            $this->queue();
+            $queueData	 		= $this->getQueueData();
+
+            $this->data($queueData['queue'], $message);
 		}
         $config				= Config::get();
 

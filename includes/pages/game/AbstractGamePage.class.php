@@ -469,9 +469,13 @@ abstract class AbstractGamePage
 		$this->jsonArr = array_merge($array, $this->jsonArr);
 	}
 
-    protected function data($data) {
+    protected function data($data, $message = []) {
         $this->save();
-        echo json_encode($data, true);
+        echo json_encode(
+            array(
+                'data' => $data,
+                'message' => $message
+            ), true);
         exit;
     }
 
@@ -499,13 +503,15 @@ abstract class AbstractGamePage
             'reslist'		=> $reslist,
 		), false);
 
-		echo json_encode($this->jsonArr, true);
-		//$this->tplObj->display('extends:layout.'.$this->getWindow().'.tpl|'.$file);
+        echo json_encode(
+            array(
+                'data' => $this->jsonArr,
+                'message' => []
+            ), true);
 		exit;
 	}
 
 	protected function sendJSON($data) {
-		$this->save();
 		echo json_encode($data);
 		exit;
 	}

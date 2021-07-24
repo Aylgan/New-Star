@@ -367,13 +367,14 @@ class ResourceUpdate
     {
         foreach ($p['tiles'] as $tile => $buildElem){
             if($buildElem['build_end_time'] != 0 && $buildElem['build_end_time'] < $this->TIME ){
+                $p['tiles'][$tile]['build_end_time'] = 0;
+
                 if($buildElem['build_mode'] != 'destroy'){
-                    $p['tiles'][$tile]['build_lvl'] += 1;
+                    $p['tiles'][$tile]['build_lvl'] = $p['tiles'][$tile]['build_lvl'] + 1;
                 }else{
                     $p['tiles'][$tile]['build_lvl'] = max($p['tiles'][$tile]['build_lvl'] - 1, 0);
                 }
 
-                $p['tiles'][$tile]['build_end_time'] = 0;
                 $p['tiles'][$tile]['build_mode'] = '';
                 $p['tiles'][$tile]['isUpdate'] = true;
             }
@@ -642,7 +643,7 @@ class ResourceUpdate
                 $params	+= array(
                     $tParam.'planet'			    => $PLANET['id'],
                     $tParam.'build_id'			    => $buildElem['build_id'],
-                    $tParam.'build_lvl'			    => 1,
+                    $tParam.'build_lvl'			    => 0,
                     $tParam.'tile'			        => $tile,
                     $tParam.'build_end_time'	    => $buildElem['build_end_time'],
                     $tParam.'build_mode'			=> $buildElem['build_mode']

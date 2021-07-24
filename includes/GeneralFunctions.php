@@ -252,6 +252,7 @@ function getPlanetTiles($PLANET)
             }
 
 
+
         }
         else{
             $tileContent = array(
@@ -262,7 +263,8 @@ function getPlanetTiles($PLANET)
                 'tile'		        => $i,
                 'build_end_time'    => 0,
                 'build_mode'        => '',
-                'lastupdate'        => 0
+                'lastupdate'        => 0,
+                'rest_time'         => 0
             );
         }
 
@@ -272,6 +274,10 @@ function getPlanetTiles($PLANET)
         $tileContent['rRes'] = '';
 
         $tileContent['name'] = ($tileContent['build_id'] !== 0) ? $LNG['tech'][$tileContent['build_id']] : $LNG['tile_empty'];
+
+        $tileContent['rest_time'] = $tileContent['build_end_time']-TIMESTAMP;
+        $tileContent['build_end_time'] = (int) $tileContent['build_end_time'];
+        $tileContent['build_lvl'] = (int) $tileContent['build_lvl'];
 
         $tilesList[$i] = $tileContent;
     }
