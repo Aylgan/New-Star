@@ -116,14 +116,15 @@ class ResourceUpdate
 			$this->ShipyardQueue();
 			if($this->Tech == true && $this->USER['b_tech'] != 0 && $this->USER['b_tech'] < $this->TIME)
 				$this->ResearchQueue();
-			if($this->PLANET['b_building'] != 0)
-				$this->BuildingQueue();
 		}
 		
 		$this->UpdateResource($this->TIME, $HASH);
 			
 		if($SAVE === true)
 			$this->SavePlanetToDB($this->USER, $this->PLANET);
+
+
+
 			
 		return $this->ReturnVars();
 	}
@@ -361,68 +362,24 @@ class ResourceUpdate
 
 		return true;
 	}
-	
-	private function BuildingQueue() 
-	{
-        $this->CheckPlanetBuildingsNew();
-	}
 
-    private function CheckPlanetBuildingsNew()
+    private function CheckPlanetBuildingsNew($p)
     {
-        global $resource, $reslist;
+        foreach ($p['tiles'] as $tile => $buildElem){
+            if($buildElem['build_end_time'] != 0 && $buildElem['build_end_time'] < $this->TIME ){
+                if($buildElem['build_mode'] != 'destroy'){
+                    $p['tiles'][$tile]['build_lvl'] += 1;
+                }else{
+                    $p['tiles'][$tile]['build_lvl'] = max($p['tiles'][$tile]['build_lvl'] - 1, 0);
+                }
 
-        if (empty($this->PLANET['b_building_id']) || $this->PLANET['b_building'] > $this->TIME)
-            return false;
-
-        $CurrentQueue	= unserialize($this->PLANET['b_building_id']);
-
-        $b_building = 0;
-
-        foreach($CurrentQueue as $key => $builElem)
-        {
-            $Element      	= $builElem[0];
-            $level      	= $builElem[1];
-            $BuildEndTime 	= $builElem[3];
-            $BuildMode    	= $builElem[4];
-            $tile			= $builElem[5];
-
-            if ($BuildEndTime > $this->TIME){
-                if($b_building == 0)
-                    $b_building = $BuildEndTime;
-                elseif($b_building > $BuildEndTime)
-                    $b_building = $BuildEndTime;
-
-                continue;
+                $p['tiles'][$tile]['build_end_time'] = 0;
+                $p['tiles'][$tile]['build_mode'] = '';
+                $p['tiles'][$tile]['isUpdate'] = true;
             }
-
-            if(!isset($this->BuildedTile[$tile][$Element]))
-                $this->BuildedTile[$tile][$Element] = 0;
-
-            $this->PLANET['tiles'][$tile]['build_lvl']	= $level;
-            $this->BuildedTile[$tile][$Element]			= $level;
-
-            unset($CurrentQueue[$key]);
-
-            $OnHash	= in_array($Element, $reslist['prod']);
-            $this->UpdateResource($BuildEndTime, !$OnHash);
         }
 
-        $NewQueueArray	= array();
-
-        foreach($CurrentQueue as $ListIDArray) {
-            $NewQueueArray[]	= $ListIDArray;
-        }
-
-        if (count($NewQueueArray) == 0) {
-            $this->PLANET['b_building']    	= 0;
-            $this->PLANET['b_building_id'] 	= '';
-
-            return false;
-        } else {
-            $this->PLANET['b_building']    	= $b_building;
-            $this->PLANET['b_building_id'] 	= serialize($NewQueueArray);
-            return true;
-        }
+        return $p;
     }
 
 	private function ResearchQueue()
@@ -588,6 +545,8 @@ class ResourceUpdate
         if(is_null($PLANET))
             global $PLANET;
 
+        $PLANET = $this->CheckPlanetBuildingsNew($PLANET);
+
         $buildQueries	= array();
 
         $buildTileQueries	= array();
@@ -662,51 +621,49 @@ class ResourceUpdate
         }
 
         $tSql = "";
-        $tparams = array();
-        if (!empty($this->BuildedTile))
-        {
-            foreach($this->BuildedTile as $tileId => $tile){
-                foreach($tile as $element => $level){
 
-                    if($PLANET['tiles'][$tileId]['build_id'] == 0){
-                        $QueryData	= array();
+        foreach($PLANET['tiles'] as $tile => $buildElem){
+            if($PLANET['tiles'][$tile]['build_id'] == 0){
+                continue;
+            }
 
-                        $QueryData[]	=	$PLANET['id'];
-                        $QueryData[]	=	$element;
-                        $QueryData[]	=	1;
-                        $QueryData[]	=	$tileId;
-                        $QueryData[]	=	"'".md5($PLANET['id'].'_'.$tileId)."'";
+            if($PLANET['tiles'][$tile]['isUpdate'] === false){
+                continue;
+            }
 
-                        $tSql	.= "INSERT INTO %%BUILDS%% (planet, build_id, build_lvl, tile, hash) VALUES (".implode(", ", $QueryData).");";
-                    }else{
-                        if($level > 0){
-                            $tparams	= array(
-                                ':blvl' => $level,
-                                ':planetId' => $PLANET['id'],
-                                ':tile' => $tileId
-                            );
-                            $tSql	.= "UPDATE %%BUILDS%% SET build_lvl = ".$tparams[':blvl']." WHERE planet = ".$tparams[':planetId']." AND tile = ".$tparams[':tile'].";";
+            $tParam = ":t_".$tile."_".$PLANET['id']."_";
+            $hash = md5($PLANET['id'].'_'.$tile);
 
-                        }else{
-                            $tparams	= array(
-                                ':planetId' => $PLANET['id'],
-                                ':tile' => $tileId
-                            );
-                            $tSql	.= "DELETE FROM %%BUILDS%% WHERE planet = ".$tparams[':planetId']." AND tile = ".$tparams[':tile'].";";
-                        }
-                    }
+            $params	+= array(
+                $tParam.'hash'			    => $hash
+            );
+
+            if($PLANET['tiles'][$tile]['id'] == 0){
+                $params	+= array(
+                    $tParam.'planet'			    => $PLANET['id'],
+                    $tParam.'build_id'			    => $buildElem['build_id'],
+                    $tParam.'build_lvl'			    => 1,
+                    $tParam.'tile'			        => $tile,
+                    $tParam.'build_end_time'	    => $buildElem['build_end_time'],
+                    $tParam.'build_mode'			=> $buildElem['build_mode']
+                );
+
+                $tSql	.= 'INSERT INTO %%BUILDS%% (planet, build_id, build_lvl, tile, build_end_time, build_mode, hash) VALUES ('.$tParam.'planet, '.$tParam.'build_id, '.$tParam.'build_lvl, '.$tParam.'tile, '.$tParam.'build_end_time, '.$tParam.'build_mode, '.$tParam.'hash);';
+
+            }else{
+                if($buildElem['build_lvl'] > 0){
+                    $params	+= array(
+                        $tParam."build_lvl"			    => $buildElem['build_lvl'],
+                        $tParam."build_end_time"	    => $buildElem['build_end_time'],
+                        $tParam."build_mode"			=> $buildElem['build_mode']
+                    );
+
+                    $tSql	.= 'UPDATE %%BUILDS%% SET build_lvl = '.$tParam.'build_lvl, build_end_time = '.$tParam.'build_end_time, build_mode = '.$tParam.'build_mode WHERE hash = '.$tParam.'hash;';
+                }else{
+                    $tSql	.= 'DELETE FROM %%BUILDS%% WHERE hash = '.$tParam.'hash;';
                 }
-
-                unset($this->BuildedTile[$tileId]);
             }
         }
-
-
-
-        if($tSql != ""){
-            Database::get()->nativeQuery($tSql);
-        }
-
 
         $sql = 'UPDATE %%PLANETS%% as p,%%USERS%% as u SET
             p.eco_hash			= :ecoHash,
@@ -742,10 +699,13 @@ class ResourceUpdate
         }
 
         $sql .= ' WHERE p.id = :planetId AND u.id = :userId;';
-
+        $sql .= $tSql;
+/*
+         echo $sql;
+         var_dump($params);
+*/
         Database::get()->update($sql, $params);
 
-        $this->BuildedTile	= array();
 
         return array($USER, $PLANET);
 	}

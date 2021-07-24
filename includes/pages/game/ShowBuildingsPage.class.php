@@ -188,34 +188,12 @@ class ShowBuildingsPage extends AbstractGamePage
             || !BuildFunctions::isTechnologieAccessible($USER, $PLANET, $Element)
             || ($Element == 31 && $USER["b_tech_planet"] != 0)
             || (($Element == 15 || $Element == 21) && !empty($PLANET['b_hangar_id']))
-            || (!$AddMode && $PLANET[$resource[$Element]] == 0)
+            || (!$AddMode && $PLANET[$resource[$Element]] == 0
+            || $tile == 0
+            || $PLANET['tiles'][$tile]['build_end_time'] > 0
+            || ($PLANET['tiles'][$tile]['build_id'] != 0 && $PLANET['tiles'][$tile]['build_id'] != $Element))
         )
             return;
-
-        $CurrentQueue  		= unserialize($PLANET['b_building_id']);
-
-
-        if (!empty($CurrentQueue)) {
-            $ActualCount	= count($CurrentQueue);
-        } else {
-            $CurrentQueue	= array();
-            $ActualCount	= 0;
-        }
-
-        $CurrentMaxFields  	= CalculateMaxPlanetFields($PLANET);
-
-        $config	= Config::get();
-
-        if (($type == 'normal' && $AddMode && $PLANET["field_current"] >= ($CurrentMaxFields - $ActualCount)))
-        {
-            return;
-        }
-
-        foreach($CurrentQueue as $QueueSubArray)
-        {
-            if($QueueSubArray[5] == $tile && ($QueueSubArray[3] > TIMESTAMP))
-                return;
-        }
 
         $BuildMode 			= $AddMode ? 'build' : 'destroy';
 
@@ -227,10 +205,6 @@ class ShowBuildingsPage extends AbstractGamePage
             }else{
                 $BuildLevel			= max($PLANET['tiles'][$tile]['build_lvl'] - 1, 0);
             }
-
-
-            if($PLANET['tiles'][$tile]['build_id'] != 0 && $PLANET['tiles'][$tile]['build_id'] != $Element)
-                return;
         }
 
         if($pricelist[$Element]['max'] < $BuildLevel)
@@ -248,25 +222,11 @@ class ShowBuildingsPage extends AbstractGamePage
 
         $elementTime    			= BuildFunctions::getBuildingTime($USER, $PLANET, $Element, $costResources);
         $BuildEndTime				= TIMESTAMP + $elementTime;
-        $CurrentQueue[]				= array($Element, $BuildLevel, $elementTime, $BuildEndTime, $BuildMode, $tile);
-        $PLANET['b_building_id']	= serialize($CurrentQueue);
 
-        $b_building = 0;
-        foreach($CurrentQueue as $key => $builElem)
-        {
-            $Element      	= $builElem[0];
-            $BuildEndTime 	= $builElem[3];
-            $BuildMode    	= $builElem[4];
-
-            if ($BuildEndTime > TIMESTAMP){
-                if($b_building == 0)
-                    $b_building = $BuildEndTime;
-                elseif($b_building > $BuildEndTime)
-                    $b_building = $BuildEndTime;
-            }
-        }
-
-        $PLANET['b_building']		= $BuildEndTime;
+        $PLANET['tiles'][$tile]['build_id']         = $Element;
+        $PLANET['tiles'][$tile]['build_end_time']   = $BuildEndTime;
+        $PLANET['tiles'][$tile]['build_mode']       = $BuildMode;
+        $PLANET['tiles'][$tile]['isUpdate']         = true;
 
         $this->queue();
 	}
@@ -356,16 +316,20 @@ class ShowBuildingsPage extends AbstractGamePage
 
     private function getQueueData()
     {
-        global $LNG, $PLANET, $USER, $resource;
+        global $LNG, $PLANET, $USER;
+        $scriptData     = [];
+        $buildQueue		= [];
 
-        $scriptData		= array();
-        $quickinfo		= array();
-        $quickinfoTile		= array();
-
-        if ($PLANET['b_building'] == 0 || $PLANET['b_building_id'] == "")
-            return array('queue' => $scriptData, 'quickinfo' => $quickinfo, 'quickinfoTile' => $quickinfoTile);
-
-        $buildQueue		= unserialize($PLANET['b_building_id']);
+        foreach ($PLANET['tiles'] as $tile => $buildElem){
+            if($buildElem['build_end_time'] != 0 && $buildElem['build_end_time'] > TIMESTAMP ){
+                $Element = $buildElem['build_id'];
+                $BuildLevel = $buildElem['build_mode'] === 'destroy' ? $buildElem['build_lvl']-1 : $buildElem['build_lvl']+1;
+                $elementTime = 0;
+                $BuildEndTime = $buildElem['build_end_time'];
+                $BuildMode = $buildElem['build_mode'];
+                $buildQueue[] = array($Element, $BuildLevel, $elementTime, $BuildEndTime, $BuildMode, $tile);
+            }
+        }
 
         function cmp($a, $b)
         {
@@ -374,13 +338,11 @@ class ShowBuildingsPage extends AbstractGamePage
 
         usort($buildQueue, "cmp");
 
+
+
         foreach($buildQueue as $BuildArray) {
             if ($BuildArray[3] < TIMESTAMP)
                 continue;
-
-            $quickinfo[$BuildArray[0]]	= $BuildArray[1];
-
-            $quickinfoTile[$BuildArray[5]][$BuildArray[0]]		= $BuildArray[1];
 
             if ($PLANET['planet_type']==3){
                 $dm_fast = floor(1000*($BuildArray[3]-TIMESTAMP)/3600);
@@ -403,7 +365,7 @@ class ShowBuildingsPage extends AbstractGamePage
             );
         }
 
-        return array('queue' => $scriptData, 'quickinfo' => $quickinfo, 'quickinfoTile' => $quickinfoTile);
+        return array('queue' => $scriptData);
     }
 	
 	private static function getHighestLevelOfElement($QueueList, $ElementID, $default){

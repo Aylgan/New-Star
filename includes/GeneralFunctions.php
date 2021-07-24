@@ -228,7 +228,7 @@ function getPlanets($USER)
 
 function getPlanetTiles($PLANET)
 {
-    global $LNG;
+    global $resource, $LNG;
 
     $sql = "SELECT *
 			FROM %%BUILDS%% WHERE planet = :planetId";
@@ -247,19 +247,26 @@ function getPlanetTiles($PLANET)
     for($i=1;$i<=$PLANET['tiles_count'];$i++){
         if(isset($planetTileList[$i])){
             $tileContent = $planetTileList[$i];
+            if($PLANET[$resource[$tileContent['build_id']]] < $tileContent['build_lvl']){
+                $PLANET[$resource[$tileContent['build_id']]] = $tileContent['build_lvl'];
+            }
+
+
         }
         else{
             $tileContent = array(
-                'id'		=> 0,
-                'planet'	=> $PLANET['id'],
-                'build_id' 	=> 0,
-                'build_lvl'	=> 0,
-                'tile'		=> $i,
-                'lastupdate' => 0,
-                ''
+                'id'		        => 0,
+                'planet'	        => $PLANET['id'],
+                'build_id' 	        => 0,
+                'build_lvl'	        => 0,
+                'tile'		        => $i,
+                'build_end_time'    => 0,
+                'build_mode'        => '',
+                'lastupdate'        => 0
             );
         }
 
+        $tileContent['isUpdate'] = false;
         $tileContent['showR'] = false;
         $tileContent['rNUm'] = 0;
         $tileContent['rRes'] = '';
