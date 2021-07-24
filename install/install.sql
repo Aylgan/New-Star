@@ -756,6 +756,20 @@ CREATE TABLE `%PREFIX%planets` (
   KEY `universe` (`universe`,`galaxy`,`system`,`planet`,`planet_type`)
 ) ENGINE=MyISAM  DEFAULT CHARSET=utf8;
 
+CREATE TABLE `%PREFIX%builds` (
+  `id` int(11) NOT NULL,
+  `planet` int(11) DEFAULT NULL,
+  `build_id` int(11) NOT NULL DEFAULT '0',
+  `build_lvl` int(11) NOT NULL DEFAULT '0',
+  `tile` int(11) NOT NULL DEFAULT '1',
+  `build_end_time` int(11) NOT NULL DEFAULT '0',
+  `build_mode` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `lastupdate` int(11) DEFAULT NULL,
+  `hash` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `hash` (`hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `%PREFIX%raports` (
   `rid` varchar(32) NOT NULL,
   `raport` text NOT NULL,
@@ -3380,6 +3394,8 @@ INSERT INTO `%PREFIX%vars_requriements` (`elementID`, `requireID`, `requireLevel
 (5022, 405, 20),
 (5022, 406, 5),
 (5023, 410, 5);
+
+
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
