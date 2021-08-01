@@ -25,7 +25,7 @@ require 'includes/common.php';
 /** @var $LNG Language */
 
 $page 		= HTTP::_GP('page', 'index');
-$mode 		= HTTP::_GP('mode', 'show');
+$mode 		= HTTP::_JSON('mode', 'show');
 
 if($page == 'lang'){
 	echo json_encode($LNG, true);

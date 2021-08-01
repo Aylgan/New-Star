@@ -28,8 +28,8 @@ class ShowVertifyPage extends AbstractLoginPage
 	{
 		global $LNG;
 
-		$validationID	= HTTP::_GP('i', 0);
-		$validationKey	= HTTP::_GP('k', '');
+		$validationID	= HTTP::_JSON('id', 0);
+		$validationKey	= HTTP::_JSON('key', '');
 
 		$db = Database::get();
 
@@ -46,7 +46,12 @@ class ShowVertifyPage extends AbstractLoginPage
 
 		if(empty($userData))
 		{
-			$this->printMessage($LNG['vertifyNoUserFound']);
+			$this->returnJson(array(
+				'error'		=> true,
+				'message'	=> $LNG['vertifyNoUserFound'],
+				'validationID'	=> $validationID,
+				'validationKey'	=> $validationKey,
+			));
 		}
 
 		$config	= Config::get();
@@ -126,12 +131,14 @@ class ShowVertifyPage extends AbstractLoginPage
 	{
 		$userData	= $this->_activeUser();
 
-		$session	= Session::create();
-		$session->userId		= (int) $userData['userID'];
-		$session->adminAccess	= 0;
-		$session->save();
+		$session = new Session;
+		$session->__set('userID', (int) $userData['userID']);
+		$session->create();
 
-		HTTP::redirectTo('game.php');
+		$this->returnJson(array(
+			'idToken'		=> $session->__get('authKey'),
+			'expiresIn'		=> $session->__get('expire') - TIMESTAMP
+		));
 	}
 
 	function json()

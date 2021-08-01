@@ -25,12 +25,13 @@ class ShowRegisterPage extends AbstractLoginPage
 	function show()
 	{
 		global $LNG;
+
 		$universeSelect	= array();	
 		$referralData	= array('id' => 0, 'name' => '');
 		$accountName	= "";
 		
-		$externalAuth	= HTTP::_GP('externalAuth', array());
-		$referralID 	= HTTP::_GP('referralID', 0);
+		$externalAuth	= HTTP::_JSON('externalAuth', array());
+		$referralID 	= HTTP::_JSON('referralID', 0);
 
 		foreach(Universe::availableUniverses() as $uniId)
 		{
@@ -92,7 +93,7 @@ class ShowRegisterPage extends AbstractLoginPage
 			'accountName'		=> $accountName,
 			'externalAuth'		=> $externalAuth,
 			'universeSelect'	=> $universeSelect,
-			'registerRulesDesc'	=> sprintf($LNG['registerRulesDesc'], '<a href="index.php?page=rules">'.$LNG['nav_rules'].'</a>')
+			'languages'			=> Language::getAllowedLangs(false),
 		));
 		
 		$this->display('page.register.default.tpl');
@@ -102,26 +103,37 @@ class ShowRegisterPage extends AbstractLoginPage
 	{
 		global $LNG;
 		$config		= Config::get();
+		
+		if (empty(HTTP::_JSON())) {
+			$this->returnJson(array(
+				'error'		=> true,
+				'message'	=> 'empty data'
+			));
+
+			exit;
+		}
 
 		if($config->game_disable == 0 || $config->reg_closed == 1)
 		{
-			$this->printMessage($LNG['registerErrorUniClosed'], array(array(
-				'label'	=> $LNG['back'],
-				'url'	=> 'javascript:window.history.back()',
-			)));
+			$this->returnJson(array(
+				'error'		=> true,
+				'message'	=> $LNG['registerErrorUniClosed']
+			));
+
+			exit;
 		}
 
-		$userName 		= HTTP::_GP('username', '', UTF8_SUPPORT);
-		$password 		= HTTP::_GP('password', '', true);
-		$password2 		= HTTP::_GP('passwordReplay', '', true);
-		$mailAddress 	= HTTP::_GP('email', '');
-		$mailAddress2	= HTTP::_GP('emailReplay', '');
-		$rulesChecked	= HTTP::_GP('rules', 0);
-		$language 		= HTTP::_GP('lang', '');
+		$userName 		= HTTP::_JSON('username', '', UTF8_SUPPORT);
+		$password 		= HTTP::_JSON('password', '', true);
+		$password2 		= HTTP::_JSON('passwordReplay', '', true);
+		$mailAddress 	= HTTP::_JSON('email', '');
+		$mailAddress2	= HTTP::_JSON('emailReplay', '');
+		$rulesChecked	= HTTP::_JSON('rules', 0);
+		$language 		= HTTP::_JSON('lang', '');
 		
-		$referralID 	= HTTP::_GP('referralID', 0);
+		$referralID 	= HTTP::_JSON('referralID', 0);
 
-		$externalAuth	= HTTP::_GP('externalAuth', array());
+		$externalAuth	= HTTP::_JSON('externalAuth', array());
 		if(!isset($externalAuth['account'], $externalAuth['method']))
 		{
 			$externalAuthUID	= 0;
@@ -227,10 +239,12 @@ class ShowRegisterPage extends AbstractLoginPage
 		}
 						
 		if (!empty($errors)) {
-			$this->printMessage(implode("<br>\r\n", $errors), array(array(
-				'label'	=> $LNG['back'],
-				'url'	=> 'javascript:window.history.back()',
-			)));
+			$this->returnJson(array(
+				'error'		=> true,
+				'message'	=> implode("<br>\r\n", $errors)
+			));
+
+			exit;
 		}
 
 		$path	= 'includes/extauth/'.$externalAuthMethod.'.class.php';
@@ -297,11 +311,14 @@ class ShowRegisterPage extends AbstractLoginPage
 		));
 
 		$validationID	= $db->lastInsertId();
-		$verifyURL	= 'index.php?page=vertify&i='.$validationID.'&k='.$validationKey;
+		$verifyURL	= 'vertify/?id='.$validationID.'&key='.$validationKey;
 		
 		if($config->user_valid == 0 || !empty($externalAuthUID))
 		{
-			$this->redirectTo($verifyURL);
+			$this->returnJson(array(
+				'validationID'		=> $validationID,
+				'validationKey'		=> $validationKey
+			));
 		}
 		else
 		{
@@ -324,7 +341,9 @@ class ShowRegisterPage extends AbstractLoginPage
 			$subject	= sprintf($LNG['registerMailVertifyTitle'], $config->game_name);
 			Mail::send($mailAddress, $userName, $subject, $MailContent);
 			
-			$this->printMessage($LNG['registerSendComplete']);
+			$this->returnJson(array(
+				'registerSendComplete'		=> $LNG['registerSendComplete']
+			));
 		}
 	}
 }
