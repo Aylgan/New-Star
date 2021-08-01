@@ -79,7 +79,7 @@ class PlayerUtil
 			|| 1 > $position
 			|| $config->max_galaxy < $galaxy
 			|| $config->max_system < $system
-			|| $config->max_planets < $position);
+            || getGlPlanetCount($galaxy, $system) < $position);
 	}
 	
 	static public function createPlayer($universe, $userName, $userPassword, $userMail, $userLanguage = NULL, $galaxy = NULL, $system = NULL, $position = NULL, $name = NULL, $authlevel = 0, $userIpAddress = NULL)
@@ -111,7 +111,6 @@ class PlayerUtil
 			}
 			
 			do {
-				$position = mt_rand(round($config->max_planets * 0.2), round($config->max_planets * 0.8));
 				if ($planet < 3) {
 					$planet += 1;
 				} else {
@@ -126,6 +125,8 @@ class PlayerUtil
 						$system += 1;
 					}
 				}
+
+                $position = mt_rand(1, getGlPlanetCount($galaxy, $system));
 			} while (self::isPositionFree($universe, $galaxy, $system, $position) === false);
 
 			// Update last coordinates to config table
@@ -239,7 +240,7 @@ class PlayerUtil
 
 		$config		= Config::get($universe);
 
-		$dataIndex		= (int) ceil($position / ($config->max_planets / count($planetData)));
+        $dataIndex = (int) ceil(($position / getGlPlanetCount($galaxy, $system)) * count($planetData));
 		$maxTemperature	= $planetData[$dataIndex]['temp'];
 		$minTemperature	= $maxTemperature - 40;
 

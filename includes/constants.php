@@ -263,3 +263,7 @@ define('ELEMENT_BUILD_ON_MOONS'		, 2097152);
 define('ELEMENT_RESOURCE_ON_TF'		, 4194304);
 define('ELEMENT_RESOURCE_ON_FLEET'	, 8388608);
 define('ELEMENT_RESOURCE_ON_STEAL'	, 16777216);
+
+define('GALAXYSALT', '#ItN:OD;c'); // any salt
+define('MINPLANET', 3);
+define('MAXPLANET', 8);

@@ -37,9 +37,9 @@ class ShowGalaxyPage extends AbstractGamePage
 		$galaxyRight	= HTTP::_GP('galaxyRight', '');
 		$systemLeft		= HTTP::_GP('systemLeft', '');
 		$systemRight	= HTTP::_GP('systemRight', '');
-		$galaxy			= min(max(HTTP::_GP('galaxy', (int) $PLANET['galaxy']), 1), $config->max_galaxy);
-		$system			= min(max(HTTP::_GP('system', (int) $PLANET['system']), 1), $config->max_system);
-		$planet			= min(max(HTTP::_GP('planet', (int) $PLANET['planet']), 1), $config->max_planets);
+		$galaxy			= min(max(HTTP::_JSON('galaxy', (int) $PLANET['galaxy']), 1), $config->max_galaxy);
+		$system			= min(max(HTTP::_JSON('system', (int) $PLANET['system']), 1), $config->max_system);
+        $planet         = min(max(HTTP::_JSON('planet', (int) $PLANET['planet']), 1), getGlPlanetCount($galaxy, $system));
 		$type			= HTTP::_GP('type', 1);
 		$current		= HTTP::_GP('current', 0);
 		
@@ -89,7 +89,6 @@ class ShowGalaxyPage extends AbstractGamePage
 		$Result	= $galaxyRows->getGalaxyData();
         require('includes/vars/PlanetData.php');	
 
-        $this->tplObj->loadscript('galaxy.js');
         $this->assign(array(
 			'GalaxyRows'				=> $Result,
 			'planetcount'				=> (is_array($Result) ? count($Result) : 0),
@@ -112,7 +111,7 @@ class ShowGalaxyPage extends AbstractGamePage
 			'current_system'			=> $PLANET['system'],
 			'current_planet'			=> $PLANET['planet'],
 			'planet_type' 				=> $PLANET['planet_type'],
-            'max_planets'               => $config->max_planets,
+            'max_planets'               => getGlPlanetCount($galaxy, $system),
             'planet_factor'             => $config->planet_factor,
 			'missileSelector'			=> $missileSelector,
             'planetData'				=> $planetData,
@@ -127,6 +126,7 @@ class ShowGalaxyPage extends AbstractGamePage
 				'friend'					=> $LNG['gl_short_friend'],
 				'member'					=> $LNG['gl_short_member'],
 			),
+            'pageName'			        => $LNG['lm_galaxy'],
 		));
 		
 		$this->display('page.galaxy.default.tpl');

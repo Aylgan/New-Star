@@ -287,6 +287,27 @@ function getPlanetTiles($PLANET)
     return $tilesList;
 }
 
+function getGlPlanetCount($galaxy, $system) {
+    $sha1 = hash("sha1", GALAXYSALT.$galaxy.GALAXYSALT.$system);
+    $numhash = unpack('n1', $sha1)[1];
+    return randNum($numhash) + MINPLANET - 1;
+}
+function randNum($number){
+    $number = strval($number);
+    $sum	 = 0;
+    for($i = 0; $i < strlen($number); $i++) {
+        $sum += $number[$i];
+    }
+
+    if($sum < 10 && $sum > MAXPLANET){
+        $strVal = base_convert($sum, 10, MAXPLANET - MINPLANET + 1);
+        $sum = randNum((int)$strVal);
+    }elseif($sum > MAXPLANET)
+        $sum = randNum($sum);
+
+    return $sum;
+}
+
 function get_timezone_selector() {
 	// New Timezone Selector, better support for changes in tzdata (new russian timezones, e.g.)
 	// http://www.php.net/manual/en/datetimezone.listidentifiers.php

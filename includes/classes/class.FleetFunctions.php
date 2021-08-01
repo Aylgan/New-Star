@@ -419,8 +419,8 @@ class FleetFunctions
 		$YourPlanet				= (!empty($GetInfoPlanet['id_owner']) && $GetInfoPlanet['id_owner'] == $USER['id']) ? true : false;
 		$UsedPlanet				= (!empty($GetInfoPlanet['id_owner'])) ? true : false;
 		$availableMissions		= array();
-			
-        if ($MissionInfo['planet'] == (Config::get($USER['universe'])->max_planets + 1))
+
+        if ($MissionInfo['planet'] == (getGlPlanetCount($MissionInfo['galaxy'], $MissionInfo['system']) + 1))
 		{
 			if(isModuleAvailable(MODULE_MISSION_EXPEDITION))
 			$availableMissions[]	= 15;

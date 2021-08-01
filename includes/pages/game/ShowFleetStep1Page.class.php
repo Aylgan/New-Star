@@ -278,7 +278,7 @@ class ShowFleetStep1Page extends AbstractGamePage
 		}
 
 		// If target is expedition
-		if ($targetPlanet != Config::get()->max_planets + 1)
+		if ($targetPlanet != getGlPlanetCount($targetGalaxy, $targetSystem) + 1)
 		{
 			$db = Database::get();
             $sql = "SELECT u.id, u.urlaubs_modus, u.user_lastip, u.authattack,

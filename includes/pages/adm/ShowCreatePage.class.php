@@ -80,7 +80,7 @@ class ShowCreatePage extends AbstractAdminPage
                         $errors .= $LNG['cr_planet_already_exists'];
                     }	
 				
-                    if ($Galaxy > $config->max_galaxy || $System > $config->max_system || $Planet > $config->max_planets) {
+                    if ($Galaxy > $config->max_galaxy || $System > $config->max_system || $Planet > getGlPlanetCount($Galaxy, $System)) {
                         $errors .= $LNG['cr_complete_all2'];
                     }
 
@@ -159,7 +159,7 @@ class ShowCreatePage extends AbstractAdminPage
 
                     $config			= Config::get();
     
-                    if ($Galaxy > $config->max_galaxy || $System > $config->max_system || $Planet > $config->max_planets) {
+                    if ($Galaxy > $config->max_galaxy || $System > $config->max_system || $Planet > getGlPlanetCount($Galaxy, $System)) {
                         $this->printMessage($LNG['cr_complete_all2'], true, array('?page=create&class=planet', 3));
                     }
 				
