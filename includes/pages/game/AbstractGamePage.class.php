@@ -498,11 +498,6 @@ abstract class AbstractGamePage
 			'basepath'		=> PROTOCOL.HTTP_HOST.HTTP_BASE,
 		));
 
-		$this->assign(array(
-			'LNG'			=> $LNG,
-            'reslist'		=> $reslist,
-		), false);
-
         echo json_encode(
             array(
                 'data' => $this->jsonArr,
